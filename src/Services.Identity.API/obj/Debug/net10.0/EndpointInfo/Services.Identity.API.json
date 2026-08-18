@@ -5,6 +5,46 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/Articles/masivos": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloDto"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloDto"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloDto"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Auth/login": {
       "post": {
         "tags": [
@@ -39,6 +79,28 @@
   },
   "components": {
     "schemas": {
+      "ArticuloDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemsGroupCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "LoginRequest": {
         "type": "object",
         "properties": {
@@ -56,6 +118,9 @@
     }
   },
   "tags": [
+    {
+      "name": "Articles"
+    },
     {
       "name": "Auth"
     }

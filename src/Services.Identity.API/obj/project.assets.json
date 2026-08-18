@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": {
     "net10.0": {
       "Azure.Core/1.47.1": {
@@ -1608,23 +1608,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Administrador\\.nuget\\packages\\": {},
+    "C:\\Users\\SYS03\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Administrador\\source\\repos\\CompraVentaCRM\\CompraVentaPlatform\\src\\Services.Identity.API\\Services.Identity.API.csproj",
+      "projectUniqueName": "D:\\OneDrive - Makita Perú S.A\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\Services.Identity.API.csproj",
       "projectName": "Services.Identity.API",
-      "projectPath": "C:\\Users\\Administrador\\source\\repos\\CompraVentaCRM\\CompraVentaPlatform\\src\\Services.Identity.API\\Services.Identity.API.csproj",
-      "packagesPath": "C:\\Users\\Administrador\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Administrador\\source\\repos\\CompraVentaCRM\\CompraVentaPlatform\\src\\Services.Identity.API\\obj\\",
+      "projectPath": "D:\\OneDrive - Makita Perú S.A\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\Services.Identity.API.csproj",
+      "packagesPath": "C:\\Users\\SYS03\\.nuget\\packages\\",
+      "outputPath": "D:\\OneDrive - Makita Perú S.A\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\Administrador\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\SYS03\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -1633,11 +1633,11 @@
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net10.0": {
+          "framework": "net10.0",
           "targetAlias": "net10.0",
           "projectReferences": {}
         }
@@ -1652,10 +1652,11 @@
         "auditLevel": "low",
         "auditMode": "all"
       },
-      "SdkAnalysisLevel": "10.0.200"
+      "SdkAnalysisLevel": "10.0.400"
     },
     "frameworks": {
       "net10.0": {
+        "framework": "net10.0",
         "targetAlias": "net10.0",
         "dependencies": {
           "Microsoft.AspNetCore.OpenApi": {
@@ -1698,7 +1699,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.203/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.AspNetCore": "(,10.0.32767]",
           "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
@@ -2115,5 +2116,17 @@
         }
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "NU1903",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "El paquete \"Microsoft.OpenApi\" 2.4.1 tiene una vulnerabilidad de gravedad alta conocida, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc",
+      "libraryId": "Microsoft.OpenApi",
+      "targetGraphs": [
+        "net10.0"
+      ]
+    }
+  ]
 }
