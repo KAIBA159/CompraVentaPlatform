@@ -1,66 +1,77 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Services.Identity.API.Services;
+using Services.Identity.API.DTOs;
 
 namespace Services.Identity.API.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
     public class ArticlesController : ControllerBase
     {
-        private readonly ILogger<ArticlesController> _logger;
+        private readonly SapServiceLayerAuth _sapAuth;
+        private readonly SapArticleService _articleService;
+        private readonly string _baseUrl = "https://192.168.1.17:50000/";
 
-        public ArticlesController(ILogger<ArticlesController> logger)
+        public ArticlesController(SapServiceLayerAuth sapAuth, SapArticleService articleService)
         {
-            _logger = logger;
+            _sapAuth = sapAuth;
+            _articleService = articleService;
         }
 
-        [HttpPost("masivos")]
-        public async Task<IActionResult> CrearArticulosMasivos([FromBody] List<ArticuloDto> articulos)
+        [HttpPost("crear-masivo-simples")]
+        public async Task<IActionResult> CrearArticulosSimplesMasivos([FromBody] List<ArticuloSimpleMigracionDto> articulos)
         {
             if (articulos == null || !articulos.Any())
             {
-                return BadRequest(new { success = false, message = "No se recibieron artículos para procesar." });
+                return BadRequest(new { success = false, message = "La lista de artículos está vacía." });
             }
 
             var resultados = new List<object>();
 
-            foreach (var item in articulos)
+            try
             {
-                try
+                // 1. Obtenemos la cookie de sesión activa de la Service Layer
+                string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
+
+                // Configurar HttpClient ignorando certificados SSL autofirmados
+                var handler = new HttpClientHandler
                 {
-                    // Lógica temporal de simulación para procesamiento masivo hacia SAP B1 10.0
-                    resultados.Add(new
-                    {
-                        itemCode = item.ItemCode,
-                        status = "OK",
-                        message = "Artículo preparado / simulado correctamente"
-                    });
-                }
-                catch (Exception ex)
+                    ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+                };
+                using var client = new HttpClient(handler) { BaseAddress = new Uri(_baseUrl) };
+
+                foreach (var item in articulos)
                 {
-                    _logger.LogError(ex, "Error al procesar el artículo {ItemCode}", item.ItemCode);
-                    resultados.Add(new
+                    try
                     {
-                        itemCode = item.ItemCode,
-                        status = "ERROR",
-                        message = ex.Message
-                    });
+                        // 2. Invocamos al servicio exclusivo para artículos simples y precios múltiples
+                        var resultado = await _articleService.CrearArticuloSimpleAsync(item, sessionCookie, client);
+
+                        if (!resultado.Exito)
+                        {
+                            resultados.Add(new { itemCode = item.ItemCode, status = "ERROR_ITEM", message = resultado.Mensaje });
+                            continue;
+                        }
+
+                        resultados.Add(new { itemCode = item.ItemCode, status = "OK", message = "Registrado correctamente en SAP B1" });
+                    }
+                    catch (Exception exItem)
+                    {
+                        resultados.Add(new { itemCode = item.ItemCode, status = "EXCEPTION", message = exItem.Message });
+                    }
                 }
+
+                return Ok(new
+                {
+                    success = true,
+                    totalProcesados = articulos.Count,
+                    detalles = resultados
+                });
             }
-
-            return Ok(new
+            catch (Exception ex)
             {
-                success = true,
-                totalProcesados = articulos.Count,
-                detalles = resultados
-            });
+                return StatusCode(500, new { success = false, message = $"Error general en la pasarela Service Layer: {ex.Message}" });
+            }
         }
-    }
-
-    public class ArticuloDto
-    {
-        public string ItemCode { get; set; } = string.Empty;
-        public string ItemName { get; set; } = string.Empty;
-        public int ItemsGroupCode { get; set; }
-        public decimal Price { get; set; }
     }
 }

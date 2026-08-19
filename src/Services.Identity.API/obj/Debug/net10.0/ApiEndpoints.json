@@ -1,15 +1,15 @@
 [
   {
     "ContainingType": "Services.Identity.API.Controllers.ArticlesController",
-    "Method": "CrearArticulosMasivos",
-    "RelativePath": "api/Articles/masivos",
+    "Method": "CrearArticulosSimplesMasivos",
+    "RelativePath": "api/Articles/crear-masivo-simples",
     "HttpMethod": "POST",
     "IsController": true,
     "Order": 0,
     "Parameters": [
       {
         "Name": "articulos",
-        "Type": "System.Collections.Generic.List\u00601[[Services.Identity.API.Controllers.ArticuloDto, Services.Identity.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "Type": "System.Collections.Generic.List\u00601[[Services.Identity.API.DTOs.ArticuloSimpleMigracionDto, Services.Identity.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
         "IsRequired": true
       }
     ],

@@ -5,7 +5,7 @@
     "version": "1.0"
   },
   "paths": {
-    "/api/Articles/masivos": {
+    "/api/Articles/crear-masivo-simples": {
       "post": {
         "tags": [
           "Articles"
@@ -16,7 +16,7 @@
               "schema": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/ArticuloDto"
+                  "$ref": "#/components/schemas/ArticuloSimpleMigracionDto"
                 }
               }
             },
@@ -24,7 +24,7 @@
               "schema": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/ArticuloDto"
+                  "$ref": "#/components/schemas/ArticuloSimpleMigracionDto"
                 }
               }
             },
@@ -32,7 +32,7 @@
               "schema": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/ArticuloDto"
+                  "$ref": "#/components/schemas/ArticuloSimpleMigracionDto"
                 }
               }
             }
@@ -79,7 +79,7 @@
   },
   "components": {
     "schemas": {
-      "ArticuloDto": {
+      "ArticuloSimpleMigracionDto": {
         "type": "object",
         "properties": {
           "itemCode": {
@@ -90,13 +90,40 @@
             "type": "string",
             "nullable": true
           },
+          "itemType": {
+            "type": "string",
+            "nullable": true
+          },
           "itemsGroupCode": {
             "type": "integer",
             "format": "int32"
           },
-          "price": {
-            "type": "number",
-            "format": "double"
+          "u_EXX_TIPOEXIS": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_EXX_TIPOUMED": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_EXM_PERCOM": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_EXM_ESTOBS": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_MKA_TINCOS": {
+            "type": "string",
+            "nullable": true
+          },
+          "precios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrecioItemDto"
+            },
+            "nullable": true
           }
         },
         "additionalProperties": false
@@ -111,6 +138,20 @@
           "password": {
             "type": "string",
             "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "PrecioItemDto": {
+        "type": "object",
+        "properties": {
+          "priceListId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number",
+            "format": "double"
           }
         },
         "additionalProperties": false
