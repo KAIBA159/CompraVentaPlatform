@@ -16,8 +16,31 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2b. Configuración de Autenticación (Requerido para el módulo de Login)
-// Aquí definimos que usaremos JWT Bearer para proteger las rutas
+////// 2b. Configuración de Autenticación (Requerido para el módulo de Login)
+////// Aquí definimos que usaremos JWT Bearer para proteger las rutas
+////builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+////    .AddJwtBearer(options =>
+////    {
+////        options.TokenValidationParameters = new TokenValidationParameters
+////        {
+////            ValidateIssuer = true,
+////            ValidateAudience = true,
+////            ValidateLifetime = true,
+////            ValidateIssuerSigningKey = true,
+////            // NOTA: Estas claves deben venir de un lugar seguro en producción (ej. Azure Key Vault)
+////            // Por ahora, para tu autenticación propia, se leerán desde el appsettings.json
+////            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+////            ValidAudience = builder.Configuration["Jwt:Audience"],
+////            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+////        };
+////    });
+
+
+//nuevo
+
+// Leemos la clave de forma segura; si no existe en appsettings.json, asigna una por defecto para desarrollo
+var jwtKey = builder.Configuration["Jwt:Key"] ?? "ClaveSecretaSuperSeguraPorDefectoParaDesarrolloLocal_2026";
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -27,13 +50,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            // NOTA: Estas claves deben venir de un lugar seguro en producción (ej. Azure Key Vault)
-            // Por ahora, para tu autenticación propia, se leerán desde el appsettings.json
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            // Asegúrate de validar también el emisor y audiencia si los usas, o déjalos según tu configuración
+            ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "MakitaPE",
+            ValidAudience = builder.Configuration["Jwt:Audience"] ?? "MakitaClients"
         };
     });
+
 
 // 2c. Configuración de CORS (Crucial para el entorno Web)
 // Dado que tu Front-end en React (puerto 517X) y Back-end (puerto 5243) son aplicaciones separadas,

@@ -1,12 +1,19 @@
 ﻿using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace Services.Identity.API.Services
 {
     public class SapServiceLayerAuth
     {
         private readonly string _baseUrl = "https://192.168.1.17:50000/b1s/v1/";
+        private readonly IConfiguration _configuration;
+
+        public SapServiceLayerAuth(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
         public async Task<string> ObtenerCookieSesionAsync()
         {
@@ -17,12 +24,11 @@ namespace Services.Identity.API.Services
 
             using var client = new HttpClient(handler) { BaseAddress = new Uri(_baseUrl) };
 
-            // Declaramos las credenciales exactas igual que en tu WinForms
-            string miBaseDatos = "SBO_MAKITA_20260717";
-            string miUsuario = "manager";
-            string miClave = "m1r1";
+            // Leemos dinámicamente desde appsettings.json con respaldo a tu BD actual
+            string miBaseDatos = _configuration["SapSettings:CompanyDB"] ?? "SBO_MAKITA_20260717";
+            string miUsuario = _configuration["SapSettings:UserName"] ?? "manager";
+            string miClave = _configuration["SapSettings:Password"] ?? "m1r1";
 
-            // Armamos el JSON literal idéntico al que le gusta a la Service Layer
             string loginJson = $@"{{
                 ""CompanyDB"": ""{miBaseDatos}"",
                 ""UserName"": ""{miUsuario}"",
@@ -30,8 +36,6 @@ namespace Services.Identity.API.Services
             }}";
 
             var content = new StringContent(loginJson, Encoding.UTF8, "application/json");
-
-            // Ejecutamos el POST al endpoint de Login
             var response = await client.PostAsync("Login", content);
 
             if (!response.IsSuccessStatusCode)

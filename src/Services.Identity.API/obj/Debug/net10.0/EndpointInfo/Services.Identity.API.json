@@ -45,6 +45,86 @@
         }
       }
     },
+    "/api/Articles/actualizar-masivo-simples": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloSimpleMigracionDto"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloSimpleMigracionDto"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloSimpleMigracionDto"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/Articles/crear-masivo-combos": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloComboMigracionDto"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloComboMigracionDto"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloComboMigracionDto"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Auth/login": {
       "post": {
         "tags": [
@@ -75,10 +155,94 @@
           }
         }
       }
+    },
+    "/api/System/info-conexion": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ArticuloComboMigracionDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemName": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemType": {
+            "type": "string",
+            "nullable": true
+          },
+          "itemsGroupCode": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "u_EXX_TIPOEXIS": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_EXX_TIPOUMED": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_EXM_PERCOM": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_EXM_ESTOBS": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_MKA_TINCOS": {
+            "type": "string",
+            "nullable": true
+          },
+          "precios": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrecioItemDto"
+            },
+            "nullable": true
+          },
+          "invntItem": {
+            "type": "string",
+            "nullable": true
+          },
+          "sellItem": {
+            "type": "string",
+            "nullable": true
+          },
+          "prchselitem": {
+            "type": "string",
+            "nullable": true
+          },
+          "treeType": {
+            "type": "string",
+            "nullable": true
+          },
+          "componentes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponenteBOMDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
       "ArticuloSimpleMigracionDto": {
         "type": "object",
         "properties": {
@@ -128,6 +292,20 @@
         },
         "additionalProperties": false
       },
+      "ComponenteBOMDto": {
+        "type": "object",
+        "properties": {
+          "itemCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "additionalProperties": false
+      },
       "LoginRequest": {
         "type": "object",
         "properties": {
@@ -164,6 +342,9 @@
     },
     {
       "name": "Auth"
+    },
+    {
+      "name": "System"
     }
   ]
 }

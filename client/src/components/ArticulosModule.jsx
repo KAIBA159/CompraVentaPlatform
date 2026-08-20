@@ -3,7 +3,8 @@ import * as XLSX from 'xlsx';
 
 export default function ArticulosModule({ onBack }) {
   const [file, setFile] = useState(null);
-  const [tipoEstructura, setTipoEstructura] = useState('simple');
+  const [tipoEstructura, setTipoEstructura] = useState('simple'); // 'simple' | 'con_bom'
+  const [tipoOperacion, setTipoOperacion] = useState('crear');     // 'crear' | 'actualizar'
   const [loading, setLoading] = useState(false);
   const [progresoTexto, setProgresoTexto] = useState('');
   const [porcentajeProgreso, setPorcentajeProgreso] = useState(0);
@@ -30,10 +31,16 @@ export default function ArticulosModule({ onBack }) {
     setPorcentajeProgreso(0);
 
     const reader = new FileReader();
+
+    reader.onerror = () => {
+      setLoading(false);
+      alert('Error al leer el archivo en el navegador.');
+    };
+
     reader.onload = async (evt) => {
       try {
-        const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const buffer = evt.target.result;
+        const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
         const nombreHoja = "Articulos";
         const ws = wb.Sheets[nombreHoja] || wb.Sheets[wb.SheetNames[0]];
@@ -47,6 +54,7 @@ export default function ArticulosModule({ onBack }) {
 
         rawData.forEach((row) => {
           const itemCode = row.ItemCode;
+          // FILTRO DE SEGURIDAD: Omite filas vacías o si el código es la cabecera 'ITEMCODE'
           if (!itemCode || String(itemCode).toUpperCase() === 'ITEMCODE') return;
 
           if (!articulosMap[itemCode]) {
@@ -71,6 +79,12 @@ export default function ArticulosModule({ onBack }) {
               itemName: String(row.ItemName || ''),
               itemType: String(row.ItemType || 'I'),
               itemsGroupCode: Number(row.ItemsGroupCode || 100),
+              // NUEVOS CAMPOS LOGÍSTICOS PARA COMBOS
+              invntItem: String(row.InvntItem || 'N'),
+              sellItem: String(row.SellItem || 'Y'),
+              prchselitem: String(row.Prchselitem || 'N'),
+              treeType: String(row.TipoLMat || 'A'),
+              // CAMPOS SUNAT Y ADICIONALES
               u_EXX_TIPOEXIS: String(row.U_EXX_TIPOEXIS || ''),
               u_EXX_TIPOUMED: String(row.U_EXX_TIPOUMED || ''),
               u_EXM_PERCOM: String(row.U_EXM_PERCOM || ''),
@@ -82,6 +96,7 @@ export default function ArticulosModule({ onBack }) {
             };
           }
 
+          // CAPTURA DE COMPONENTES DE LA LISTA DE MATERIALES (BOM)
           if (tipoEstructura === 'con_bom' && row.Componente_Code) {
             articulosMap[itemCode].componentes.push({
               itemCode: String(row.Componente_Code),
@@ -94,20 +109,28 @@ export default function ArticulosModule({ onBack }) {
         const totalRegistros = payloadFinal.length;
 
         if (totalRegistros === 0) {
-          alert('No se encontraron registros válidos para procesar.');
+          alert('No se encontraron registros válidos para procesar en el archivo.');
           setLoading(false);
           return;
         }
 
+        // SELECCIÓN DINÁMICA DE ENDPOINTS SEGÚN ESTRUCTURA Y OPERACIÓN
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5243';
-        const endpointDestino = tipoEstructura === 'simple' 
-          ? `${baseUrl}/api/Articles/crear-masivo-simples` 
-          : `${baseUrl}/api/Articles/crear-masivo`;
+        let endpointDestino = '';
+
+        if (tipoEstructura === 'simple') {
+          endpointDestino = tipoOperacion === 'crear' 
+            ? `${baseUrl}/api/Articles/crear-masivo-simples` 
+            : `${baseUrl}/api/Articles/actualizar-masivo-simples`;
+        } else {
+          endpointDestino = tipoOperacion === 'crear' 
+            ? `${baseUrl}/api/Articles/crear-masivo-combos` 
+            : `${baseUrl}/api/Articles/actualizar-masivo-combos`;
+        }
 
         // ESTRATEGIA DE LOTES (BLOQUES DE 50)
         const tamanoBloque = 50;
         let detallesAcumulados = [];
-        let exitososCount = 0;
 
         for (let i = 0; i < totalRegistros; i += tamanoBloque) {
           const bloque = payloadFinal.slice(i, i + tamanoBloque);
@@ -130,7 +153,6 @@ export default function ArticulosModule({ onBack }) {
               const resultadosBloque = data.detalles || data;
               if (Array.isArray(resultadosBloque)) {
                 detallesAcumulados.push(...resultadosBloque);
-                exitososCount += resultadosBloque.filter(d => d.status === 'OK').length;
               }
             } else {
               detallesAcumulados.push({
@@ -149,7 +171,7 @@ export default function ArticulosModule({ onBack }) {
         setLoading(false);
         setResultado({
           success: true,
-          message: `Carga masiva por lotes finalizada [Modalidad: ${tipoEstructura.toUpperCase()}].`,
+          message: `Proceso de ${tipoOperacion.toUpperCase()} finalizado [Modalidad: ${tipoEstructura === 'simple' ? 'ARTÍCULOS SIMPLES' : 'COMBOS / BOM'}].`,
           total: totalRegistros,
           detalles: detallesAcumulados
         });
@@ -160,7 +182,7 @@ export default function ArticulosModule({ onBack }) {
       }
     };
 
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   };
 
   return (
@@ -176,27 +198,54 @@ export default function ArticulosModule({ onBack }) {
         Sincronización masiva optimizada por bloques hacia la base de datos de SAP Business One.
       </p>
 
-      <div style={styles.optionsCard}>
-        <label style={styles.optionLabel}>Seleccione la estructura del artículo:</label>
-        <div style={styles.radioGroup}>
-          <label style={styles.radioLabel}>
-            <input 
-              type="radio" 
-              name="tipoEstructura" 
-              checked={tipoEstructura === 'simple'} 
-              onChange={() => setTipoEstructura('simple')} 
-            />
-            (Artículos/Producto)
-          </label>
-          <label style={styles.radioLabel}>
-            <input 
-              type="radio" 
-              name="tipoEstructura" 
-              checked={tipoEstructura === 'con_bom'} 
-              onChange={() => setTipoEstructura('con_bom')} 
-            />
-            (Articulo/Combos) Lista Materiales
-          </label>
+      {/* PANEL DE CONFIGURACIÓN DUAL */}
+      <div style={styles.configGrid}>
+        <div style={styles.optionsCard}>
+          <label style={styles.optionLabel}>1. Seleccione la estructura:</label>
+          <div style={styles.radioGroup}>
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoEstructura" 
+                checked={tipoEstructura === 'simple'} 
+                onChange={() => setTipoEstructura('simple')} 
+              />
+              📦 Artículos / Producto Simple
+            </label>
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoEstructura" 
+                checked={tipoEstructura === 'con_bom'} 
+                onChange={() => setTipoEstructura('con_bom')} 
+              />
+              🔗 Artículos / Combos (Lista Materiales)
+            </label>
+          </div>
+        </div>
+
+        <div style={styles.optionsCard}>
+          <label style={styles.optionLabel}>2. Seleccione la operación:</label>
+          <div style={styles.radioGroup}>
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'crear'} 
+                onChange={() => setTipoOperacion('crear')} 
+              />
+              ➕ Crear Nuevos Registros
+            </label>
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizar'} 
+                onChange={() => setTipoOperacion('actualizar')} 
+              />
+              🔄 Actualizar Registros Existentes
+            </label>
+          </div>
         </div>
       </div>
 
@@ -221,7 +270,7 @@ export default function ArticulosModule({ onBack }) {
 
         {file && !loading && (
           <button type="submit" style={styles.submitBtn}>
-            Ejecutar Carga Masiva por Lotes (50 en 50)
+            Ejecutar {tipoOperacion.toUpperCase()} Masiva ({tipoEstructura === 'simple' ? 'Simples' : 'Combos'}) en Lotes
           </button>
         )}
 
@@ -240,7 +289,7 @@ export default function ArticulosModule({ onBack }) {
         <div style={resultado.success ? styles.resultBox : styles.errorBox}>
           <h4 style={{ margin: '0 0 10px 0' }}>✅ {resultado.message}</h4>
           <p>Total de registros procesados: <strong>{resultado.total}</strong></p>
-          {/* CONTENEDOR CON SCROLLBAR */}
+          
           <div style={styles.codeBlockWithScroll}>
             <pre style={{ margin: 0, fontFamily: 'monospace' }}>
               {JSON.stringify(resultado.detalles, null, 2)}
@@ -258,7 +307,8 @@ const styles = {
   backBtn: { backgroundColor: '#f0f0f0', color: '#333', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600' },
   title: { margin: 0, color: '#212121', fontSize: '20px' },
   subtitle: { color: '#666', marginBottom: '25px', fontSize: '14px' },
-  optionsCard: { backgroundColor: '#f9f9f9', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e0e0e0', marginBottom: '20px' },
+  configGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '15px', marginBottom: '20px' },
+  optionsCard: { backgroundColor: '#f9f9f9', padding: '15px 20px', borderRadius: '8px', border: '1px solid #e0e0e0' },
   optionLabel: { display: 'block', fontWeight: '600', marginBottom: '10px', color: '#333', fontSize: '14px' },
   radioGroup: { display: 'flex', flexDirection: 'column', gap: '8px' },
   radioLabel: { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#444', cursor: 'pointer' },
@@ -275,15 +325,14 @@ const styles = {
   progressPercentage: { fontSize: '12px', color: '#666', marginTop: '5px', textAlign: 'right' },
   resultBox: { marginTop: '25px', padding: '20px', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #c8e6c9' },
   errorBox: { marginTop: '25px', padding: '20px', backgroundColor: '#ffebee', borderRadius: '8px', border: '1px solid #ffcdd2' },
-  // ESTILO CON SCROLLBAR PARA EL JSON DE RESPUESTA
   codeBlockWithScroll: { 
     backgroundColor: '#fff', 
     padding: '12px', 
     borderRadius: '6px', 
     fontSize: '12px', 
-    maxHeight: '300px',     /* Altura máxima para activar el scroll */
-    overflowY: 'auto',      /* Barra de desplazamiento vertical automática */
-    overflowX: 'auto',      /* Barra de desplazamiento horizontal si es necesaria */
+    maxHeight: '300px', 
+    overflowY: 'auto', 
+    overflowX: 'auto', 
     marginTop: '10px', 
     border: '1px solid #ddd',
     textAlign: 'left'

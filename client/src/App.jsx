@@ -1,13 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginForm from './components/LoginForm';
-import ArticulosModule from './components/ArticulosModule'; // <-- Importamos tu componente modular
+import ArticulosModule from './components/ArticulosModule';
 
 export default function App() {
-  const [user, setUser] = useState(localStorage.getItem('user'));
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
   const [activeModule, setActiveModule] = useState('home');
+  const [databaseName, setDatabaseName] = useState('Cargando BD...');
 
-  const handleLoginSuccess = (username) => {
-    setUser(username);
+  // Consultar el nombre de la base de datos conectada en el backend al iniciar sesión
+  useEffect(() => {
+    if (user) {
+      const fetchDbInfo = async () => {
+        try {
+          const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5243';
+          const res = await fetch(`${baseUrl}/api/System/info-conexion`);
+          const data = await res.json();
+          if (data.success) {
+            setDatabaseName(data.databaseName);
+          }
+        } catch (err) {
+          setDatabaseName('SBODemo_PE (Local)');
+        }
+      };
+      fetchDbInfo();
+    }
+  }, [user]);
+
+  const handleLoginSuccess = (userData) => {
+    // userData puede venir como objeto o string desde el LoginForm
+    const userInfo = typeof userData === 'object' ? userData : { username: userData, fullName: 'Coordinador TI' };
+    setUser(userInfo);
   };
 
   const handleLogout = () => {
@@ -22,15 +44,25 @@ export default function App() {
 
   return (
     <div style={styles.appContainer}>
-      {/* Barra Superior / Header Responsive */}
+      {/* Barra Superior / Header Responsive con BD y Usuario */}
       <header style={styles.header}>
         <div style={styles.brandContainer}>
           <span style={styles.logoMini}>Makita PE</span>
           <span style={styles.badgeUtil}>Utilitarios & Migraciones</span>
         </div>
-        <div style={styles.userContainer}>
-          <span style={styles.userName}>👤 {user}</span>
-          <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar Sesión</button>
+
+        <div style={styles.headerRight}>
+          {/* Indicador de Base de Datos */}
+          <div style={styles.dbBadge}>
+            <span style={styles.dbDot}>🟢</span> 
+            <span>BD: <strong>{databaseName}</strong></span>
+          </div>
+
+          {/* Perfil de Usuario en duro */}
+          <div style={styles.userContainer}>
+            <span style={styles.userName}>👤 {user?.fullName || 'Coordinador TI'}</span>
+            <button onClick={handleLogout} style={styles.logoutBtn}>Cerrar Sesión</button>
+          </div>
         </div>
       </header>
 
@@ -48,7 +80,7 @@ export default function App() {
               <div style={styles.card} onClick={() => setActiveModule('articulos')}>
                 <div style={styles.cardIcon}>📦</div>
                 <h3>Carga Masiva de Artículos</h3>
-                <p>Importación de productos y servicios (Precios múltiples por listas y BOM).</p>
+                <p>Importación de productos simples y combos (Precios múltiples y Lista de Materiales).</p>
                 <span style={styles.cardAction}>Entrar al módulo &rarr;</span>
               </div>
 
@@ -107,8 +139,11 @@ const styles = {
   brandContainer: { display: 'flex', alignItems: 'center', gap: '15px' },
   logoMini: { backgroundColor: '#d32f2f', color: '#fff', padding: '4px 12px', fontWeight: 'bold', fontStyle: 'italic', fontSize: '18px', borderRadius: '4px' },
   badgeUtil: { fontSize: '14px', color: '#bbb', borderLeft: '1px solid #555', paddingLeft: '15px' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: '20px', flexWrap: 'wrap' },
+  dbBadge: { display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#2a2a2a', padding: '6px 12px', borderRadius: '6px', fontSize: '13px', color: '#ddd', border: '1px solid #444' },
+  dbDot: { fontSize: '8px' },
   userContainer: { display: 'flex', alignItems: 'center', gap: '15px' },
-  userName: { fontSize: '14px', color: '#ddd' },
+  userName: { fontSize: '14px', color: '#ddd', fontWeight: '500' },
   logoutBtn: { backgroundColor: 'transparent', color: '#ff5252', border: '1px solid #ff5252', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontWeight: '600', transition: '0.2s' },
   mainContent: { maxWidth: '1200px', margin: '30px auto', padding: '0 20px' },
   welcomeBanner: { background: '#ffffff', padding: '25px 30px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', marginBottom: '30px', borderLeft: '5px solid #d32f2f' },
