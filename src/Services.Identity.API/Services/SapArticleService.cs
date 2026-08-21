@@ -1,4 +1,5 @@
 ﻿using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Services.Identity.API.DTOs;
 
@@ -6,67 +7,47 @@ namespace Services.Identity.API.Services
 {
     public class SapArticleService
     {
+        // NOTA: Como el HttpClient ya tiene BaseAddress en el controlador, 
+        // solo necesitamos pasar el nombre del recurso (ej: "Items" o "ProductTrees")
+
         private readonly string _baseUrl = "https://192.168.1.17:50000/b1s/v1/";
 
-        /// <summary>
-        /// Crea un artículo simple en SAP Business One con sus precios múltiples y campos SUNAT.
-        /// </summary>
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = null // OBLIGATORIO: Mantiene estrictamente PascalCase para SAP
+        };
+
+        // ==============================================================================
+        // 1. CREAR ARTÍCULO SIMPLE
+        // ==============================================================================
         public async Task<(bool Exito, string Mensaje)> CrearArticuloSimpleAsync(
-            ArticuloSimpleMigracionDto item,
-            string sessionCookie,
-            HttpClient client)
+            ArticuloSimpleMigracionDto item, string sessionCookie, HttpClient client)
         {
             try
             {
-                // 1. Asegurar la cookie de sesión en las cabeceras del cliente HTTP
-                if (!client.DefaultRequestHeaders.Contains("Cookie"))
-                {
-                    client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
-                }
+                EnsureCookie(client, sessionCookie);
 
-                // 2. Mapeo de precios múltiples hacia la estructura de la Service Layer
-                var itemPrices = item.Precios?.Select(p => new
-                {
-                    PriceList = p.PriceListId,
-                    Price = p.Price
-                }).ToList() ?? new();
+                var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
 
-                // 3. Construcción del payload respetando los nombres exactos de SAP
                 var itemPayload = new
                 {
                     ItemCode = item.ItemCode,
                     ItemName = item.ItemName,
                     ItemType = item.ItemType ?? "I",
                     ItemsGroupCode = item.ItemsGroupCode,
-                    InvntItem = item.InvntItem,      // <-- Con I mayúscula
-                    SellItem = item.SellItem,        // <-- Con S mayúscula
-                    PrchseItem = item.Prchselitem,   // <-- Nota el orden: PrchseItem (con 'se' antes de Item)
                     U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
                     U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
                     U_EXM_PERCOM = item.U_EXM_PERCOM,
                     U_EXM_ESTOBS = item.U_EXM_ESTOBS,
-                    U_MKA_TINCOS = item.U_MKA_TINCOS
+                    U_MKA_TINCOS = item.U_MKA_TINCOS,
+                    ItemPrices = itemPrices
                 };
 
-                // 4. Configuración para evitar que .NET convierta las propiedades a minúsculas (camelCase)
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = null // Mantiene estrictamente PascalCase (ItemCode, ItemName, etc.)
-                };
+                var response = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
+                if (!response.IsSuccessStatusCode)
+                    return (false, $"Error al crear artículo simple: {await response.Content.ReadAsStringAsync()}");
 
-                // 5. Envío de la petición POST con la URL absoluta
-                string urlAbsoluta = $"{_baseUrl}Items";
-                var response = await client.PostAsJsonAsync(urlAbsoluta, itemPayload, jsonOptions);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    return (true, "Registrado correctamente en SAP B1");
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    return (false, $"Error Service Layer: {errorContent}");
-                }
+                return (true, "Artículo simple registrado correctamente en SAP B1");
             }
             catch (Exception ex)
             {
@@ -74,30 +55,18 @@ namespace Services.Identity.API.Services
             }
         }
 
-        /// <summary>
-        /// Actualiza un artículo simple existente en SAP Business One utilizando el verbo PATCH de OData.
-        /// </summary>
+        // ==============================================================================
+        // 2. ACTUALIZAR ARTÍCULO SIMPLE (PATCH)
+        // ==============================================================================
         public async Task<(bool Exito, string Mensaje)> ActualizarArticuloSimpleAsync(
-            ArticuloSimpleMigracionDto item,
-            string sessionCookie,
-            HttpClient client)
+            ArticuloSimpleMigracionDto item, string sessionCookie, HttpClient client)
         {
             try
             {
-                // 1. Asegurar la cookie de sesión
-                if (!client.DefaultRequestHeaders.Contains("Cookie"))
-                {
-                    client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
-                }
+                EnsureCookie(client, sessionCookie);
 
-                // 2. Mapeo de precios múltiples
-                var itemPrices = item.Precios?.Select(p => new
-                {
-                    PriceList = p.PriceListId,
-                    Price = p.Price
-                }).ToList() ?? new();
+                var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
 
-                // 3. Payload con los campos modificables
                 var itemPayload = new
                 {
                     ItemName = item.ItemName,
@@ -110,24 +79,14 @@ namespace Services.Identity.API.Services
                     ItemPrices = itemPrices
                 };
 
-                var jsonOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = null // Mantiene PascalCase
-                };
+                // Uso de StringContent para PATCH, más seguro en versiones variadas de .NET
+                var content = new StringContent(JsonSerializer.Serialize(itemPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                var response = await client.PatchAsync($"Items('{item.ItemCode}')", content);
 
-                // 4. Petición PATCH OData apuntando al recurso específico: Items('CodigoArticulo')
-                string urlOData = $"{_baseUrl}Items('{item.ItemCode}')";
-                var response = await client.PatchAsJsonAsync(urlOData, itemPayload, jsonOptions);
+                if (!response.IsSuccessStatusCode)
+                    return (false, $"Error al actualizar artículo simple: {await response.Content.ReadAsStringAsync()}");
 
-                if (response.IsSuccessStatusCode)
-                {
-                    return (true, "Actualizado correctamente en SAP B1");
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    return (false, $"Error Service Layer: {errorContent}");
-                }
+                return (true, "Artículo simple actualizado correctamente en SAP B1");
             }
             catch (Exception ex)
             {
@@ -135,38 +94,41 @@ namespace Services.Identity.API.Services
             }
         }
 
-        public async Task<(bool Exito, string Mensaje)> CrearArticuloComboAsync(
-    ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
+        // ==============================================================================
+        // 3. CREAR ARTÍCULO COMBO + LISTA DE MATERIALES (BOM)
+        // ==============================================================================
+        /*public async Task<(bool Exito, string Mensaje)> CrearArticuloComboAsync(
+            ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
         {
             try
             {
-                if (!client.DefaultRequestHeaders.Contains("Cookie"))
-                    client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
+                EnsureCookie(client, sessionCookie);
 
-                // 1. Payload del Artículo Padre con los indicadores solicitados
+                // A. Crear Cabecera del Combo
+                var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
+
                 var itemPayload = new
                 {
                     ItemCode = item.ItemCode,
                     ItemName = item.ItemName,
                     ItemType = item.ItemType ?? "I",
                     ItemsGroupCode = item.ItemsGroupCode,
-                    InvntItem = item.InvntItem,
-                    SellItem = item.SellItem,
-                    Prchselitem = item.Prchselitem,
+                    InvntItem = item.InvntItem,         // "N"
+                    SellItem = item.SellItem,           // "Y"
+                    PrchseItem = item.Prchselitem,      // "N" (Ortografía exacta de SAP)
                     U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
                     U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
                     U_EXM_PERCOM = item.U_EXM_PERCOM,
                     U_EXM_ESTOBS = item.U_EXM_ESTOBS,
-                    U_MKA_TINCOS = item.U_MKA_TINCOS
+                    U_MKA_TINCOS = item.U_MKA_TINCOS,
+                    ItemPrices = itemPrices
                 };
 
-                var responseItem = await client.PostAsJsonAsync("b1s/v1/Items", itemPayload);
+                var responseItem = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
                 if (!responseItem.IsSuccessStatusCode)
-                {
-                    return (false, $"Error al crear artículo padre: {await responseItem.Content.ReadAsStringAsync()}");
-                }
+                    return (false, $"Error al crear artículo padre (Combo): {await responseItem.Content.ReadAsStringAsync()}");
 
-                // 2. Payload para la Lista de Materiales (BOM) vía ProductTrees
+                // B. Crear Lista de Materiales (BOM)
                 var treeLines = item.Componentes.Select(c => new
                 {
                     ChildCode = c.ItemCode,
@@ -177,15 +139,94 @@ namespace Services.Identity.API.Services
                 var bomPayload = new
                 {
                     TreeCode = item.ItemCode,
-                    TreeType = item.TreeType,
+                    TreeType = item.TreeType ?? "iSales", // iSales = Conjunto
                     PriceList = 1,
                     ProductTreeLines = treeLines
                 };
 
-                var responseBom = await client.PostAsJsonAsync("b1s/v1/ProductTrees", bomPayload);
+                var responseBom = await client.PostAsJsonAsync("ProductTrees", bomPayload, _jsonOptions);
+                if (!responseBom.IsSuccessStatusCode)
+                    return (false, $"Padre creado, pero falló la Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
+
+                return (true, "Combo y Lista de Materiales creados correctamente en SAP B1");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Excepción interna: {ex.Message}");
+            }
+        }*/
+
+
+        public async Task<(bool Exito, string Mensaje)> CrearArticuloComboAsync(
+    ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
+        {
+            try
+            {
+                if (!client.DefaultRequestHeaders.Contains("Cookie"))
+                    client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
+
+                var itemPrices = item.Precios?.Select(p => new
+                {
+                    PriceList = p.PriceListId,
+                    Price = p.Price
+                }).ToList() ?? new();
+
+                // 1. Payload del Artículo Padre (Combo)
+                var itemPayload = new
+                {
+                    ItemCode = item.ItemCode,
+                    ItemName = item.ItemName,
+                    ItemType = item.ItemType ?? "I",
+                    ItemsGroupCode = item.ItemsGroupCode,
+
+                    // Nombres exactos exigidos por la Service Layer
+                    // + Mapeo seguro y estricto hacia BoYesNoEnum
+                    InventoryItem = item.InvntItem == "Y" ? "tYES" : "tNO",
+                    SalesItem = item.SellItem == "Y" ? "tYES" : "tNO",
+                    PurchaseItem = item.Prchselitem == "Y" ? "tYES" : "tNO",
+
+                    U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
+                    U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
+                    U_EXM_PERCOM = item.U_EXM_PERCOM,
+                    U_EXM_ESTOBS = item.U_EXM_ESTOBS,
+                    U_MKA_TINCOS = item.U_MKA_TINCOS,
+                    ItemPrices = itemPrices
+                };
+
+                var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = null };
+
+                // SOLUCIÓN 1: Forzamos la URL absoluta concatenando _baseUrl
+                string urlItems = $"{_baseUrl}Items";
+                var responseItem = await client.PostAsJsonAsync(urlItems, itemPayload, jsonOptions);
+
+                if (!responseItem.IsSuccessStatusCode)
+                {
+                    return (false, $"Error al crear artículo padre: {await responseItem.Content.ReadAsStringAsync()}");
+                }
+
+                // 2. Payload para la Lista de Materiales (BOM)
+                var treeLines = item.Componentes.Select(c => new
+                {
+                    ItemCode = c.ItemCode,  // ✅ SAP Service Layer exige "ItemCode" para las líneas del BOM
+                    Quantity = c.Quantity,
+                    Warehouse = "ALM01"
+                }).ToList();
+
+                var bomPayload = new
+                {
+                    TreeCode = item.ItemCode,
+                    TreeType = item.TreeType ?? "iSales",
+                    PriceList = 1,
+                    ProductTreeLines = treeLines
+                };
+
+                // SOLUCIÓN 2: URL absoluta para la entidad ProductTrees
+                string urlBom = $"{_baseUrl}ProductTrees";
+                var responseBom = await client.PostAsJsonAsync(urlBom, bomPayload, jsonOptions);
+
                 if (!responseBom.IsSuccessStatusCode)
                 {
-                    return (false, $"Artículo creado, but Error en Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
+                    return (false, $"Artículo creado, pero Error en Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
                 }
 
                 return (true, "Combo y Lista de Materiales registrados correctamente en SAP B1");
@@ -199,6 +240,79 @@ namespace Services.Identity.API.Services
 
 
 
+        // ==============================================================================
+        // 4. ACTUALIZAR ARTÍCULO COMBO + LISTA DE MATERIALES (PATCH)
+        // ==============================================================================
+        public async Task<(bool Exito, string Mensaje)> ActualizarArticuloComboAsync(
+            ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
+        {
+            try
+            {
+                EnsureCookie(client, sessionCookie);
 
+                // A. Actualizar Cabecera del Combo (Items)
+                var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
+
+                var itemPayload = new
+                {
+                    ItemName = item.ItemName,
+                    ItemsGroupCode = item.ItemsGroupCode,
+                    InvntItem = item.InvntItem,
+                    SellItem = item.SellItem,
+                    PrchseItem = item.Prchselitem,
+                    U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
+                    U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
+                    U_EXM_PERCOM = item.U_EXM_PERCOM,
+                    U_EXM_ESTOBS = item.U_EXM_ESTOBS,
+                    U_MKA_TINCOS = item.U_MKA_TINCOS,
+                    ItemPrices = itemPrices
+                };
+
+                var contentItem = new StringContent(JsonSerializer.Serialize(itemPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                var responseItem = await client.PatchAsync($"Items('{item.ItemCode}')", contentItem);
+
+                if (!responseItem.IsSuccessStatusCode)
+                    return (false, $"Error al actualizar artículo padre (Combo): {await responseItem.Content.ReadAsStringAsync()}");
+
+                // B. Actualizar Lista de Materiales (ProductTrees)
+                // En Service Layer, al mandar ProductTreeLines en un PATCH, SAP reemplaza/actualiza las líneas enviadas.
+                var treeLines = item.Componentes.Select(c => new
+                {
+                    ChildCode = c.ItemCode,
+                    Quantity = c.Quantity,
+                    Warehouse = "ALM01"
+                }).ToList();
+
+                var bomPayload = new
+                {
+                    TreeType = item.TreeType ?? "iSales",
+                    PriceList = 1,
+                    ProductTreeLines = treeLines
+                };
+
+                var contentBom = new StringContent(JsonSerializer.Serialize(bomPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                var responseBom = await client.PatchAsync($"ProductTrees('{item.ItemCode}')", contentBom);
+
+                if (!responseBom.IsSuccessStatusCode)
+                    return (false, $"Padre actualizado, pero falló actualizar la Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
+
+                return (true, "Combo y Lista de Materiales actualizados correctamente en SAP B1");
+            }
+            catch (Exception ex)
+            {
+                return (false, $"Excepción interna: {ex.Message}");
+            }
+        }
+
+        // ==============================================================================
+        // MÉTODO AUXILIAR
+        // ==============================================================================
+        private void EnsureCookie(HttpClient client, string sessionCookie)
+        {
+            if (!client.DefaultRequestHeaders.Contains("Cookie"))
+            {
+                client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
+            }
+        }
     }
 }
