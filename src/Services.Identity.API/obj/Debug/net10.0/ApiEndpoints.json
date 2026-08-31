@@ -1,6 +1,22 @@
 [
   {
     "ContainingType": "Services.Identity.API.Controllers.ArticlesController",
+    "Method": "ActualizarCombosMasivos",
+    "RelativePath": "api/Articles/actualizar-masivo-combos",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "combos",
+        "Type": "System.Collections.Generic.List\u00601[[Services.Identity.API.DTOs.ArticuloComboMigracionDto, Services.Identity.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Services.Identity.API.Controllers.ArticlesController",
     "Method": "ActualizarArticulosSimplesMasivos",
     "RelativePath": "api/Articles/actualizar-masivo-simples",
     "HttpMethod": "POST",

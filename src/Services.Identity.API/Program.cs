@@ -1,46 +1,22 @@
-// Importante: Agregar el namespace de seguridad y configuración
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Services.Identity.API.Data;
+using Services.Identity.API.DTOs; // O Configurations, según donde dejaste SapSettings
 using Services.Identity.API.Services;
 using System.Text;
 
-// 1. Inicia el constructor de la aplicación
 var builder = WebApplication.CreateBuilder(args);
 
-// 2. CONFIGURACIÓN DE SERVICIOS
-
-// 2a. Conectar la Base de Datos (SQL Server Express / Azure SQL)
-// Usamos la cadena de conexión definida en appsettings.json (o variables de entorno en Azure)
+// 1. BASE DE DATOS (SQL Server Express / Azure SQL)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-////// 2b. Configuración de Autenticación (Requerido para el módulo de Login)
-////// Aquí definimos que usaremos JWT Bearer para proteger las rutas
-////builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-////    .AddJwtBearer(options =>
-////    {
-////        options.TokenValidationParameters = new TokenValidationParameters
-////        {
-////            ValidateIssuer = true,
-////            ValidateAudience = true,
-////            ValidateLifetime = true,
-////            ValidateIssuerSigningKey = true,
-////            // NOTA: Estas claves deben venir de un lugar seguro en producción (ej. Azure Key Vault)
-////            // Por ahora, para tu autenticación propia, se leerán desde el appsettings.json
-////            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-////            ValidAudience = builder.Configuration["Jwt:Audience"],
-////            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
-////        };
-////    });
+// 2. CONFIGURACIONES CENTRALIZADAS
+builder.Services.Configure<SapSettings>(builder.Configuration.GetSection("SapSettings"));
 
-
-//nuevo
-
-// Leemos la clave de forma segura; si no existe en appsettings.json, asigna una por defecto para desarrollo
+// 3. AUTENTICACIÓN JWT
 var jwtKey = builder.Configuration["Jwt:Key"] ?? "ClaveSecretaSuperSeguraPorDefectoParaDesarrolloLocal_2026";
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -51,68 +27,52 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-            // Asegúrate de validar también el emisor y audiencia si los usas, o déjalos según tu configuración
             ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "MakitaPE",
             ValidAudience = builder.Configuration["Jwt:Audience"] ?? "MakitaClients"
         };
     });
 
-
-// 2c. Configuración de CORS (Crucial para el entorno Web)
-// Dado que tu Front-end en React (puerto 517X) y Back-end (puerto 5243) son aplicaciones separadas,
-// el navegador bloqueará las peticiones si no habilitamos CORS explícitamente.
+// 4. CORS (Desarrollo local + Preparado para Producción en Azure)
 var AllowLocalhostClient = "_allowLocalhostClient";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: AllowLocalhostClient,
                       policy =>
                       {
-                          // Habilitamos el puerto donde estará corriendo React localmente.
-                          // En producción, esto se actualizará dinámicamente por App Service.
-                          policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175") // Agrega tus posibles puertos de Vite
-                                .AllowAnyHeader()
-                                .AllowAnyMethod();
+                          policy.WithOrigins(
+                              "http://localhost:5173",
+                              "http://localhost:5174",
+                              "http://localhost:5175",
+                              "https://tu-frontend-react.azurewebsites.net" // <--- Agrega tu URL de Azure aquí cuando despliegues
+                          )
+                          .AllowAnyHeader()
+                          .AllowAnyMethod();
                       });
 });
 
-// 2d. Servicios estándar de la API
+// 5. INYECCIÓN DE DEPENDENCIAS Y CONTROLADORES
 builder.Services.AddControllers();
-// Herramientas para que funcione Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
 builder.Services.AddTransient<SapServiceLayerAuth>();
 builder.Services.AddTransient<SapArticleService>();
 
-
-
-// 3. CONSTRUCCIÓN DE LA APP
 var app = builder.Build();
 
-// 4. CONFIGURACIÓN DEL PIPELINE DE MIDDLEWARE (El orden importa)
-
-// 4a. Entorno de Desarrollo: Swagger
-// Se recomienda dejar esto solo en desarrollo para no exponer la API en producción
+// 6. PIPELINE DE MIDDLEWARE (El orden es correcto y estricto)
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// 4b. Seguridad web obligatoria para Azure
 app.UseHttpsRedirection();
 
-// 4c. Aplicar la política de CORS (Debe ir ANTES de Authentication y Authorization)
 app.UseCors(AllowLocalhostClient);
 
-// 4d. Activar el sistema de Autenticación
 app.UseAuthentication();
-
-// 4e. Activar el guardia de seguridad (Autorización)
 app.UseAuthorization();
 
-// 4f. Mapea las rutas de tus controladores
 app.MapControllers();
 
-// 5. ¡Arranca el motor y se queda escuchando!
 app.Run();

@@ -15,16 +15,30 @@
         public string U_EXM_ESTOBS { get; set; }
         public string U_MKA_TINCOS { get; set; }
 
+
+        //public string WTLiable { get; set; }
+        //public string VATLiable { get; set; }
+        //public string IndirctTax { get; set; }
+
+
+
         public List<PrecioItemDto> Precios { get; set; } = new();
     }
+
+    //// 2. CLASE COMBO
+    //public class ArticuloComboMigracionDto : ArticuloSimpleMigracionDto
+    //{
+    //    public string InvntItem { get; set; }
+    //    public string SellItem { get; set; }
+    //    public string Prchselitem { get; set; }
+    //    public string TreeType { get; set; }
+    //    public List<ComponenteBOMDto> Componentes { get; set; } = new();
+    //}
 
     // 2. CLASE COMBO
     public class ArticuloComboMigracionDto : ArticuloSimpleMigracionDto
     {
-        public string InvntItem { get; set; }
-        public string SellItem { get; set; }
-        public string Prchselitem { get; set; }
-        public string TreeType { get; set; }
+        public string? TreeType { get; set; }
         public List<ComponenteBOMDto> Componentes { get; set; } = new();
     }
 
@@ -40,4 +54,6 @@
         public string ItemCode { get; set; }
         public decimal Quantity { get; set; }
     }
+
+
 }

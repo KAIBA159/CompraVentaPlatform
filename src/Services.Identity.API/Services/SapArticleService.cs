@@ -7,11 +7,6 @@ namespace Services.Identity.API.Services
 {
     public class SapArticleService
     {
-        // NOTA: Como el HttpClient ya tiene BaseAddress en el controlador, 
-        // solo necesitamos pasar el nombre del recurso (ej: "Items" o "ProductTrees")
-
-        private readonly string _baseUrl = "https://192.168.1.17:50000/b1s/v1/";
-
         private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = null // OBLIGATORIO: Mantiene estrictamente PascalCase para SAP
@@ -35,6 +30,17 @@ namespace Services.Identity.API.Services
                     ItemName = item.ItemName,
                     ItemType = item.ItemType ?? "I",
                     ItemsGroupCode = item.ItemsGroupCode,
+
+                    // REGLA: Artículos Simples -> Impuestos SIEMPRE ACTIVOS
+                    WTLiable = "tYES",
+                    VatLiable = "tYES",
+                    IndirectTax = "tYES",
+
+                    // REGLA: Artículos Simples -> Logística SIEMPRE ACTIVA
+                    InventoryItem = "tYES",
+                    SalesItem = "tYES",
+                    PurchaseItem = "tYES",
+
                     U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
                     U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
                     U_EXM_PERCOM = item.U_EXM_PERCOM,
@@ -43,7 +49,9 @@ namespace Services.Identity.API.Services
                     ItemPrices = itemPrices
                 };
 
+                // Uso de ruta relativa. El Controller pone el https://.../b1s/v1/
                 var response = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
+
                 if (!response.IsSuccessStatusCode)
                     return (false, $"Error al crear artículo simple: {await response.Content.ReadAsStringAsync()}");
 
@@ -65,22 +73,30 @@ namespace Services.Identity.API.Services
             {
                 EnsureCookie(client, sessionCookie);
 
-                var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
+                var patchPayload = new Dictionary<string, object>();
 
-                var itemPayload = new
+                if (!string.IsNullOrWhiteSpace(item.ItemName)) patchPayload["ItemName"] = item.ItemName;
+                if (item.ItemsGroupCode > 0) patchPayload["ItemsGroupCode"] = item.ItemsGroupCode;
+                if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOEXIS)) patchPayload["U_EXX_TIPOEXIS"] = item.U_EXX_TIPOEXIS;
+                if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOUMED)) patchPayload["U_EXX_TIPOUMED"] = item.U_EXX_TIPOUMED;
+                if (!string.IsNullOrWhiteSpace(item.U_EXM_PERCOM)) patchPayload["U_EXM_PERCOM"] = item.U_EXM_PERCOM;
+                if (!string.IsNullOrWhiteSpace(item.U_EXM_ESTOBS)) patchPayload["U_EXM_ESTOBS"] = item.U_EXM_ESTOBS;
+                if (!string.IsNullOrWhiteSpace(item.U_MKA_TINCOS)) patchPayload["U_MKA_TINCOS"] = item.U_MKA_TINCOS;
+
+                if (item.Precios != null && item.Precios.Any())
                 {
-                    ItemName = item.ItemName,
-                    ItemsGroupCode = item.ItemsGroupCode,
-                    U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
-                    U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
-                    U_EXM_PERCOM = item.U_EXM_PERCOM,
-                    U_EXM_ESTOBS = item.U_EXM_ESTOBS,
-                    U_MKA_TINCOS = item.U_MKA_TINCOS,
-                    ItemPrices = itemPrices
-                };
+                    patchPayload["ItemPrices"] = item.Precios.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList();
+                }
 
-                // Uso de StringContent para PATCH, más seguro en versiones variadas de .NET
-                var content = new StringContent(JsonSerializer.Serialize(itemPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                // REGLAS: Artículos Simples
+                patchPayload["WTLiable"] = "tYES";
+                patchPayload["VatLiable"] = "tYES";
+                patchPayload["IndirectTax"] = "tYES";
+                patchPayload["InventoryItem"] = "tYES";
+                patchPayload["SalesItem"] = "tYES";
+                patchPayload["PurchaseItem"] = "tYES";
+
+                var content = new StringContent(JsonSerializer.Serialize(patchPayload, _jsonOptions), Encoding.UTF8, "application/json");
                 var response = await client.PatchAsync($"Items('{item.ItemCode}')", content);
 
                 if (!response.IsSuccessStatusCode)
@@ -95,81 +111,16 @@ namespace Services.Identity.API.Services
         }
 
         // ==============================================================================
-        // 3. CREAR ARTÍCULO COMBO + LISTA DE MATERIALES (BOM)
+        // 3. CREAR ARTÍCULO COMBO + BOM
         // ==============================================================================
-        /*public async Task<(bool Exito, string Mensaje)> CrearArticuloComboAsync(
+        public async Task<(bool Exito, string Mensaje)> CrearArticuloComboAsync(
             ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
         {
             try
             {
                 EnsureCookie(client, sessionCookie);
 
-                // A. Crear Cabecera del Combo
                 var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
-
-                var itemPayload = new
-                {
-                    ItemCode = item.ItemCode,
-                    ItemName = item.ItemName,
-                    ItemType = item.ItemType ?? "I",
-                    ItemsGroupCode = item.ItemsGroupCode,
-                    InvntItem = item.InvntItem,         // "N"
-                    SellItem = item.SellItem,           // "Y"
-                    PrchseItem = item.Prchselitem,      // "N" (Ortografía exacta de SAP)
-                    U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
-                    U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
-                    U_EXM_PERCOM = item.U_EXM_PERCOM,
-                    U_EXM_ESTOBS = item.U_EXM_ESTOBS,
-                    U_MKA_TINCOS = item.U_MKA_TINCOS,
-                    ItemPrices = itemPrices
-                };
-
-                var responseItem = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
-                if (!responseItem.IsSuccessStatusCode)
-                    return (false, $"Error al crear artículo padre (Combo): {await responseItem.Content.ReadAsStringAsync()}");
-
-                // B. Crear Lista de Materiales (BOM)
-                var treeLines = item.Componentes.Select(c => new
-                {
-                    ChildCode = c.ItemCode,
-                    Quantity = c.Quantity,
-                    Warehouse = "ALM01"
-                }).ToList();
-
-                var bomPayload = new
-                {
-                    TreeCode = item.ItemCode,
-                    TreeType = item.TreeType ?? "iSales", // iSales = Conjunto
-                    PriceList = 1,
-                    ProductTreeLines = treeLines
-                };
-
-                var responseBom = await client.PostAsJsonAsync("ProductTrees", bomPayload, _jsonOptions);
-                if (!responseBom.IsSuccessStatusCode)
-                    return (false, $"Padre creado, pero falló la Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
-
-                return (true, "Combo y Lista de Materiales creados correctamente en SAP B1");
-            }
-            catch (Exception ex)
-            {
-                return (false, $"Excepción interna: {ex.Message}");
-            }
-        }*/
-
-
-        public async Task<(bool Exito, string Mensaje)> CrearArticuloComboAsync(
-    ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
-        {
-            try
-            {
-                if (!client.DefaultRequestHeaders.Contains("Cookie"))
-                    client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
-
-                var itemPrices = item.Precios?.Select(p => new
-                {
-                    PriceList = p.PriceListId,
-                    Price = p.Price
-                }).ToList() ?? new();
 
                 // 1. Payload del Artículo Padre (Combo)
                 var itemPayload = new
@@ -179,11 +130,15 @@ namespace Services.Identity.API.Services
                     ItemType = item.ItemType ?? "I",
                     ItemsGroupCode = item.ItemsGroupCode,
 
-                    // Nombres exactos exigidos por la Service Layer
-                    // + Mapeo seguro y estricto hacia BoYesNoEnum
-                    InventoryItem = item.InvntItem == "Y" ? "tYES" : "tNO",
-                    SalesItem = item.SellItem == "Y" ? "tYES" : "tNO",
-                    PurchaseItem = item.Prchselitem == "Y" ? "tYES" : "tNO",
+                    // REGLA: Combos -> Impuesto Indirecto en NO
+                    WTLiable = "tYES",
+                    VatLiable = "tYES",
+                    IndirectTax = "tNO",
+
+                    // REGLA: Logística de Combos
+                    InventoryItem = "tNO",
+                    SalesItem = "tYES",
+                    PurchaseItem = "tNO",
 
                     U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
                     U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
@@ -193,21 +148,15 @@ namespace Services.Identity.API.Services
                     ItemPrices = itemPrices
                 };
 
-                var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = null };
-
-                // SOLUCIÓN 1: Forzamos la URL absoluta concatenando _baseUrl
-                string urlItems = $"{_baseUrl}Items";
-                var responseItem = await client.PostAsJsonAsync(urlItems, itemPayload, jsonOptions);
+                var responseItem = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
 
                 if (!responseItem.IsSuccessStatusCode)
-                {
                     return (false, $"Error al crear artículo padre: {await responseItem.Content.ReadAsStringAsync()}");
-                }
 
                 // 2. Payload para la Lista de Materiales (BOM)
                 var treeLines = item.Componentes.Select(c => new
                 {
-                    ItemCode = c.ItemCode,  // ✅ SAP Service Layer exige "ItemCode" para las líneas del BOM
+                    ItemCode = c.ItemCode,
                     Quantity = c.Quantity,
                     Warehouse = "ALM01"
                 }).ToList();
@@ -220,14 +169,10 @@ namespace Services.Identity.API.Services
                     ProductTreeLines = treeLines
                 };
 
-                // SOLUCIÓN 2: URL absoluta para la entidad ProductTrees
-                string urlBom = $"{_baseUrl}ProductTrees";
-                var responseBom = await client.PostAsJsonAsync(urlBom, bomPayload, jsonOptions);
+                var responseBom = await client.PostAsJsonAsync("ProductTrees", bomPayload, _jsonOptions);
 
                 if (!responseBom.IsSuccessStatusCode)
-                {
                     return (false, $"Artículo creado, pero Error en Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
-                }
 
                 return (true, "Combo y Lista de Materiales registrados correctamente en SAP B1");
             }
@@ -237,11 +182,8 @@ namespace Services.Identity.API.Services
             }
         }
 
-
-
-
         // ==============================================================================
-        // 4. ACTUALIZAR ARTÍCULO COMBO + LISTA DE MATERIALES (PATCH)
+        // 4. ACTUALIZAR ARTÍCULO COMBO + BOM (PATCH)
         // ==============================================================================
         public async Task<(bool Exito, string Mensaje)> ActualizarArticuloComboAsync(
             ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
@@ -250,51 +192,57 @@ namespace Services.Identity.API.Services
             {
                 EnsureCookie(client, sessionCookie);
 
-                // A. Actualizar Cabecera del Combo (Items)
-                var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
+                var patchPayload = new Dictionary<string, object>();
 
-                var itemPayload = new
+                if (!string.IsNullOrWhiteSpace(item.ItemName)) patchPayload["ItemName"] = item.ItemName;
+                if (item.ItemsGroupCode > 0) patchPayload["ItemsGroupCode"] = item.ItemsGroupCode;
+                if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOEXIS)) patchPayload["U_EXX_TIPOEXIS"] = item.U_EXX_TIPOEXIS;
+                if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOUMED)) patchPayload["U_EXX_TIPOUMED"] = item.U_EXX_TIPOUMED;
+                if (!string.IsNullOrWhiteSpace(item.U_EXM_PERCOM)) patchPayload["U_EXM_PERCOM"] = item.U_EXM_PERCOM;
+                if (!string.IsNullOrWhiteSpace(item.U_EXM_ESTOBS)) patchPayload["U_EXM_ESTOBS"] = item.U_EXM_ESTOBS;
+                if (!string.IsNullOrWhiteSpace(item.U_MKA_TINCOS)) patchPayload["U_MKA_TINCOS"] = item.U_MKA_TINCOS;
+
+                if (item.Precios != null && item.Precios.Any())
                 {
-                    ItemName = item.ItemName,
-                    ItemsGroupCode = item.ItemsGroupCode,
-                    InvntItem = item.InvntItem,
-                    SellItem = item.SellItem,
-                    PrchseItem = item.Prchselitem,
-                    U_EXX_TIPOEXIS = item.U_EXX_TIPOEXIS,
-                    U_EXX_TIPOUMED = item.U_EXX_TIPOUMED,
-                    U_EXM_PERCOM = item.U_EXM_PERCOM,
-                    U_EXM_ESTOBS = item.U_EXM_ESTOBS,
-                    U_MKA_TINCOS = item.U_MKA_TINCOS,
-                    ItemPrices = itemPrices
-                };
+                    patchPayload["ItemPrices"] = item.Precios.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList();
+                }
 
-                var contentItem = new StringContent(JsonSerializer.Serialize(itemPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                // REGLAS: Combos (Se fuerza el NO en el Impuesto Indirecto)
+                patchPayload["WTLiable"] = "tYES";
+                patchPayload["VatLiable"] = "tYES";
+                patchPayload["IndirectTax"] = "tNO";
+                patchPayload["InventoryItem"] = "tNO";
+                patchPayload["SalesItem"] = "tYES";
+                patchPayload["PurchaseItem"] = "tNO";
+
+                var contentItem = new StringContent(JsonSerializer.Serialize(patchPayload, _jsonOptions), Encoding.UTF8, "application/json");
                 var responseItem = await client.PatchAsync($"Items('{item.ItemCode}')", contentItem);
 
                 if (!responseItem.IsSuccessStatusCode)
                     return (false, $"Error al actualizar artículo padre (Combo): {await responseItem.Content.ReadAsStringAsync()}");
 
-                // B. Actualizar Lista de Materiales (ProductTrees)
-                // En Service Layer, al mandar ProductTreeLines en un PATCH, SAP reemplaza/actualiza las líneas enviadas.
-                var treeLines = item.Componentes.Select(c => new
+                if (item.Componentes != null && item.Componentes.Any())
                 {
-                    ChildCode = c.ItemCode,
-                    Quantity = c.Quantity,
-                    Warehouse = "ALM01"
-                }).ToList();
+                    var treeLines = item.Componentes.Select(c => new
+                    {
+                        ItemCode = c.ItemCode,
+                        Quantity = c.Quantity,
+                        Warehouse = "ALM01"
+                    }).ToList();
 
-                var bomPayload = new
-                {
-                    TreeType = item.TreeType ?? "iSales",
-                    PriceList = 1,
-                    ProductTreeLines = treeLines
-                };
+                    var bomPayload = new
+                    {
+                        TreeType = item.TreeType ?? "iSales",
+                        PriceList = 1,
+                        ProductTreeLines = treeLines
+                    };
 
-                var contentBom = new StringContent(JsonSerializer.Serialize(bomPayload, _jsonOptions), Encoding.UTF8, "application/json");
-                var responseBom = await client.PatchAsync($"ProductTrees('{item.ItemCode}')", contentBom);
+                    var contentBom = new StringContent(JsonSerializer.Serialize(bomPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                    var responseBom = await client.PatchAsync($"ProductTrees('{item.ItemCode}')", contentBom);
 
-                if (!responseBom.IsSuccessStatusCode)
-                    return (false, $"Padre actualizado, pero falló actualizar la Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
+                    if (!responseBom.IsSuccessStatusCode)
+                        return (false, $"Padre actualizado, pero falló actualizar la Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
+                }
 
                 return (true, "Combo y Lista de Materiales actualizados correctamente en SAP B1");
             }
@@ -304,9 +252,6 @@ namespace Services.Identity.API.Services
             }
         }
 
-        // ==============================================================================
-        // MÉTODO AUXILIAR
-        // ==============================================================================
         private void EnsureCookie(HttpClient client, string sessionCookie)
         {
             if (!client.DefaultRequestHeaders.Contains("Cookie"))

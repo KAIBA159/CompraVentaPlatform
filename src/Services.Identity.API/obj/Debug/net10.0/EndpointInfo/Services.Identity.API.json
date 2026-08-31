@@ -125,6 +125,46 @@
         }
       }
     },
+    "/api/Articles/actualizar-masivo-combos": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloComboMigracionDto"
+                }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloComboMigracionDto"
+                }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ArticuloComboMigracionDto"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Auth/login": {
       "post": {
         "tags": [
@@ -215,18 +255,6 @@
             "items": {
               "$ref": "#/components/schemas/PrecioItemDto"
             },
-            "nullable": true
-          },
-          "invntItem": {
-            "type": "string",
-            "nullable": true
-          },
-          "sellItem": {
-            "type": "string",
-            "nullable": true
-          },
-          "prchselitem": {
-            "type": "string",
             "nullable": true
           },
           "treeType": {

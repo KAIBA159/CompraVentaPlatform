@@ -76,20 +76,22 @@ export default function ArticulosModule({ onBack }) {
 
             articulosMap[itemCode] = {
               itemCode: String(itemCode),
-              itemName: String(row.ItemName || ''),
-              itemType: String(row.ItemType || 'I'),
-              itemsGroupCode: Number(row.ItemsGroupCode || 100),
-              // NUEVOS CAMPOS LOGÍSTICOS PARA COMBOS
-              invntItem: String(row.InvntItem || 'N'),
-              sellItem: String(row.SellItem || 'Y'),
-              prchselitem: String(row.Prchselitem || 'N'),
-              treeType: String(row.TipoLMat || 'A'),
+              itemName: row.ItemName ? String(row.ItemName) : '',
+              itemType: row.ItemType ? String(row.ItemType) : 'I',
+              
+              // Si no viene en el Excel, se manda 0. C# lo ignorará en los PATCH para no sobrescribir.
+              itemsGroupCode: row.ItemsGroupCode ? Number(row.ItemsGroupCode) : 0,
+              
+              // Tipo de árbol para la Lista de Materiales (BOM)
+              treeType: row.TipoLMat ? String(row.TipoLMat) : 'iSales',
+
               // CAMPOS SUNAT Y ADICIONALES
-              u_EXX_TIPOEXIS: String(row.U_EXX_TIPOEXIS || ''),
-              u_EXX_TIPOUMED: String(row.U_EXX_TIPOUMED || ''),
-              u_EXM_PERCOM: String(row.U_EXM_PERCOM || ''),
-              u_EXM_ESTOBS: String(row.U_EXM_ESTOBS || ''),
-              u_MKA_TINCOS: String(row.U_MKA_TINCOS || ''),
+              u_EXX_TIPOEXIS: row.U_EXX_TIPOEXIS ? String(row.U_EXX_TIPOEXIS) : '',
+              u_EXX_TIPOUMED: row.U_EXX_TIPOUMED ? String(row.U_EXX_TIPOUMED) : '',
+              u_EXM_PERCOM: row.U_EXM_PERCOM ? String(row.U_EXM_PERCOM) : '',
+              u_EXM_ESTOBS: row.U_EXM_ESTOBS ? String(row.U_EXM_ESTOBS) : '',
+              u_MKA_TINCOS: row.U_MKA_TINCOS ? String(row.U_MKA_TINCOS) : '',
+              
               esCombo: tipoEstructura === 'con_bom' || String(row.Tipo || '').toUpperCase() === 'COMBO',
               precios: preciosList,
               componentes: []
