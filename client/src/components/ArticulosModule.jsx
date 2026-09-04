@@ -1,10 +1,11 @@
+// Archivo: src/components/ArticulosModule.jsx
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 
 export default function ArticulosModule({ onBack }) {
   const [file, setFile] = useState(null);
-  const [tipoEstructura, setTipoEstructura] = useState('simple'); // 'simple' | 'con_bom'
-  const [tipoOperacion, setTipoOperacion] = useState('crear');     // 'crear' | 'actualizar'
+  const [tipoEstructura, setTipoEstructura] = useState('simple'); 
+  const [tipoOperacion, setTipoOperacion] = useState('crear');     
   const [loading, setLoading] = useState(false);
   const [progresoTexto, setProgresoTexto] = useState('');
   const [porcentajeProgreso, setPorcentajeProgreso] = useState(0);
@@ -42,6 +43,49 @@ export default function ArticulosModule({ onBack }) {
         const buffer = evt.target.result;
         const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
+        // 1. CORRECCIÓN: Apuntar primero a la pestaña exacta del Excel
+        const ws = wb.Sheets["LISTA MAKITA BRASIL"] || wb.Sheets["Articulos"] || wb.Sheets[wb.SheetNames[0]];
+
+        const rawData = XLSX.utils.sheet_to_json(ws);
+        let payloadFinal = [];
+
+        // ====================================================================
+        // LÓGICA 1: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS
+        // ====================================================================
+        if (tipoOperacion === 'actualizarPrecioBrasil') {
+          payloadFinal = rawData.map(row => {
+            // 2. CORRECCIÓN: Búsqueda estricta de "PrecioBrasil" blindada contra espacios
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            const keyPrecio = Object.keys(row).find(k => k.trim().toLowerCase() === 'preciobrasil');
+
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
+
+            // Extrae únicamente el valor numérico, eliminando "USD "
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            const precioFinal = parseFloat(precioLimpio) || 0;
+
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              PriceListId: 16,
+              Price: precioFinal,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+        // ====================================================================
+        // LÓGICA 2: MAESTRO COMPLETO (SIMPLES O COMBOS)
+        // ====================================================================
+        //} else {
+// ... mantén el resto de tu código intacto a partir de aquí
+
+
+    /*
+    reader.onload = async (evt) => {
+      try {
+        const buffer = evt.target.result;
+        const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
+
         const nombreHoja = "Articulos";
         const ws = wb.Sheets[nombreHoja] || wb.Sheets[wb.SheetNames[0]];
 
@@ -50,77 +94,107 @@ export default function ArticulosModule({ onBack }) {
         }
 
         const rawData = XLSX.utils.sheet_to_json(ws);
-        const articulosMap = {};
+        let payloadFinal = [];
 
-        rawData.forEach((row) => {
-          const itemCode = row.ItemCode;
-          // FILTRO DE SEGURIDAD: Omite filas vacías o si el código es la cabecera 'ITEMCODE'
-          if (!itemCode || String(itemCode).toUpperCase() === 'ITEMCODE') return;
-
-          if (!articulosMap[itemCode]) {
-            const preciosList = [];
-
-            Object.keys(row).forEach((colName) => {
-              if (colName.toUpperCase().includes('LISTA') || colName.toUpperCase().includes('PRECIO')) {
-                const partes = colName.split('_');
-                const idLista = Number(partes[partes.length - 1]);
-
-                if (!isNaN(idLista) && row[colName] !== undefined && row[colName] !== '') {
-                  preciosList.push({
-                    priceListId: idLista,
-                    price: Number(row[colName])
-                  });
-                }
-              }
+        // ====================================================================
+        // LÓGICA 1: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (NUEVO)
+        // ====================================================================
+        if (tipoOperacion === 'actualizarPrecioBrasil') {
+          payloadFinal = rawData.map(row => {
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            const keyPrecio = Object.keys(row).find(k => {
+               const lowerK = k.trim().toLowerCase();
+               return lowerK === 'preciobrasil' || lowerK === 'lista makita brasil';
             });
 
-            articulosMap[itemCode] = {
-              itemCode: String(itemCode),
-              itemName: row.ItemName ? String(row.ItemName) : '',
-              itemType: row.ItemType ? String(row.ItemType) : 'I',
-              
-              // Si no viene en el Excel, se manda 0. C# lo ignorará en los PATCH para no sobrescribir.
-              itemsGroupCode: row.ItemsGroupCode ? Number(row.ItemsGroupCode) : 0,
-              
-              // Tipo de árbol para la Lista de Materiales (BOM)
-              treeType: row.TipoLMat ? String(row.TipoLMat) : 'iSales',
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
 
-              // CAMPOS SUNAT Y ADICIONALES
-              u_EXX_TIPOEXIS: row.U_EXX_TIPOEXIS ? String(row.U_EXX_TIPOEXIS) : '',
-              u_EXX_TIPOUMED: row.U_EXX_TIPOUMED ? String(row.U_EXX_TIPOUMED) : '',
-              u_EXM_PERCOM: row.U_EXM_PERCOM ? String(row.U_EXM_PERCOM) : '',
-              u_EXM_ESTOBS: row.U_EXM_ESTOBS ? String(row.U_EXM_ESTOBS) : '',
-              u_MKA_TINCOS: row.U_MKA_TINCOS ? String(row.U_MKA_TINCOS) : '',
-              
-              esCombo: tipoEstructura === 'con_bom' || String(row.Tipo || '').toUpperCase() === 'COMBO',
-              precios: preciosList,
-              componentes: []
+            const precioLimpio = String(precioRaw || '0').replace(/[^\d.-]/g, '');
+            const precioFinal = parseFloat(precioLimpio) || 0;
+
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              PriceListId: 16,
+              Price: precioFinal,
+              Currency: "USD" 
             };
-          }
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+          */
+        // ====================================================================
+        // LÓGICA 2: MAESTRO COMPLETO (SIMPLES O COMBOS) - ORIGINAL
+        // ====================================================================
+        } else {
+          const articulosMap = {};
 
-          // CAPTURA DE COMPONENTES DE LA LISTA DE MATERIALES (BOM)
-          if (tipoEstructura === 'con_bom' && row.Componente_Code) {
-            articulosMap[itemCode].componentes.push({
-              itemCode: String(row.Componente_Code),
-              quantity: Number(row.Componente_Qty || 1)
-            });
-          }
-        });
+          rawData.forEach((row) => {
+            const itemCode = row.ItemCode;
+            if (!itemCode || String(itemCode).toUpperCase() === 'ITEMCODE') return;
 
-        const payloadFinal = Object.values(articulosMap);
+            if (!articulosMap[itemCode]) {
+              const preciosList = [];
+
+              Object.keys(row).forEach((colName) => {
+                if (colName.toUpperCase().includes('LISTA') || colName.toUpperCase().includes('PRECIO')) {
+                  const partes = colName.split('_');
+                  const idLista = Number(partes[partes.length - 1]);
+
+                  if (!isNaN(idLista) && row[colName] !== undefined && row[colName] !== '') {
+                    preciosList.push({
+                      priceListId: idLista,
+                      price: Number(row[colName])
+                    });
+                  }
+                }
+              });
+
+              articulosMap[itemCode] = {
+                itemCode: String(itemCode),
+                itemName: row.ItemName ? String(row.ItemName) : '',
+                itemType: row.ItemType ? String(row.ItemType) : 'I',
+                itemsGroupCode: row.ItemsGroupCode ? Number(row.ItemsGroupCode) : 0,
+                treeType: row.TipoLMat ? String(row.TipoLMat) : 'iSales',
+                u_EXX_TIPOEXIS: row.U_EXX_TIPOEXIS ? String(row.U_EXX_TIPOEXIS) : '',
+                u_EXX_TIPOUMED: row.U_EXX_TIPOUMED ? String(row.U_EXX_TIPOUMED) : '',
+                u_EXM_PERCOM: row.U_EXM_PERCOM ? String(row.U_EXM_PERCOM) : '',
+                u_EXM_ESTOBS: row.U_EXM_ESTOBS ? String(row.U_EXM_ESTOBS) : '',
+                u_MKA_TINCOS: row.U_MKA_TINCOS ? String(row.U_MKA_TINCOS) : '',
+                esCombo: tipoEstructura === 'con_bom' || String(row.Tipo || '').toUpperCase() === 'COMBO',
+                precios: preciosList,
+                componentes: []
+              };
+            }
+
+            if (tipoEstructura === 'con_bom' && row.Componente_Code) {
+              articulosMap[itemCode].componentes.push({
+                itemCode: String(row.Componente_Code),
+                quantity: Number(row.Componente_Qty || 1)
+              });
+            }
+          });
+
+          payloadFinal = Object.values(articulosMap);
+        }
+
         const totalRegistros = payloadFinal.length;
 
         if (totalRegistros === 0) {
-          alert('No se encontraron registros válidos para procesar en el archivo.');
+          alert('No se encontraron registros válidos para procesar o los precios detectados son cero.');
           setLoading(false);
           return;
         }
 
-        // SELECCIÓN DINÁMICA DE ENDPOINTS SEGÚN ESTRUCTURA Y OPERACIÓN
+        // ====================================================================
+        // SELECCIÓN DINÁMICA DE ENDPOINTS Y MÉTODOS HTTP
+        // ====================================================================
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5243';
         let endpointDestino = '';
+        let metodoHttp = 'POST'; // Por defecto los maestros usan POST en tu backend
 
-        if (tipoEstructura === 'simple') {
+        if (tipoOperacion === 'actualizarPrecioBrasil') {
+          endpointDestino = `${baseUrl}/api/Articles/update-price`;
+          metodoHttp = 'PATCH'; // CRÍTICO: El endpoint de precios exige PATCH
+        } else if (tipoEstructura === 'simple') {
           endpointDestino = tipoOperacion === 'crear' 
             ? `${baseUrl}/api/Articles/crear-masivo-simples` 
             : `${baseUrl}/api/Articles/actualizar-masivo-simples`;
@@ -144,17 +218,19 @@ export default function ArticulosModule({ onBack }) {
 
           try {
             const response = await fetch(endpointDestino, {
-              method: 'POST',
+              method: metodoHttp, // Se inyecta PATCH o POST dinámicamente
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(bloque)
             });
 
-            const data = await response.json();
+            const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
               const resultadosBloque = data.detalles || data;
               if (Array.isArray(resultadosBloque)) {
                 detallesAcumulados.push(...resultadosBloque);
+              } else {
+                detallesAcumulados.push(data);
               }
             } else {
               detallesAcumulados.push({
@@ -173,7 +249,7 @@ export default function ArticulosModule({ onBack }) {
         setLoading(false);
         setResultado({
           success: true,
-          message: `Proceso de ${tipoOperacion.toUpperCase()} finalizado [Modalidad: ${tipoEstructura === 'simple' ? 'ARTÍCULOS SIMPLES' : 'COMBOS / BOM'}].`,
+          message: `Proceso finalizado exitosamente.`,
           total: totalRegistros,
           detalles: detallesAcumulados
         });
@@ -211,6 +287,7 @@ export default function ArticulosModule({ onBack }) {
                 name="tipoEstructura" 
                 checked={tipoEstructura === 'simple'} 
                 onChange={() => setTipoEstructura('simple')} 
+                disabled={tipoOperacion === 'actualizarPrecioBrasil'}
               />
               📦 Artículos / Producto Simple
             </label>
@@ -220,6 +297,7 @@ export default function ArticulosModule({ onBack }) {
                 name="tipoEstructura" 
                 checked={tipoEstructura === 'con_bom'} 
                 onChange={() => setTipoEstructura('con_bom')} 
+                disabled={tipoOperacion === 'actualizarPrecioBrasil'}
               />
               🔗 Artículos / Combos (Lista Materiales)
             </label>
@@ -247,6 +325,19 @@ export default function ArticulosModule({ onBack }) {
               />
               🔄 Actualizar Registros Existentes
             </label>
+            {/* AQUÍ ESTÁ EL TERCER BOTÓN AÑADIDO */}
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizarPrecioBrasil'} 
+                onChange={() => {
+                  setTipoOperacion('actualizarPrecioBrasil');
+                  setTipoEstructura('simple'); // Fuerza a 'simple' al seleccionar precios
+                }} 
+              />
+              💲 Actualizar Precio (Lista Brasil - 16)
+            </label>
           </div>
         </div>
       </div>
@@ -272,7 +363,7 @@ export default function ArticulosModule({ onBack }) {
 
         {file && !loading && (
           <button type="submit" style={styles.submitBtn}>
-            Ejecutar {tipoOperacion.toUpperCase()} Masiva ({tipoEstructura === 'simple' ? 'Simples' : 'Combos'}) en Lotes
+            Ejecutar {tipoOperacion === 'actualizarPrecioBrasil' ? 'ACTUALIZACIÓN DE PRECIOS' : `${tipoOperacion.toUpperCase()} Masiva`} en Lotes
           </button>
         )}
 
@@ -289,8 +380,12 @@ export default function ArticulosModule({ onBack }) {
 
       {resultado && (
         <div style={resultado.success ? styles.resultBox : styles.errorBox}>
-          <h4 style={{ margin: '0 0 10px 0' }}>✅ {resultado.message}</h4>
-          <p>Total de registros procesados: <strong>{resultado.total}</strong></p>
+          <h4 style={{ margin: '0 0 10px 0', color: resultado.success ? '#2e7d32' : '#c62828' }}>
+            {resultado.success ? '✅ ¡Operación Exitosa!' : '❌ Error en la Operación'}
+          </h4>
+          <p style={{ margin: '0 0 10px 0', color: '#333' }}>
+            {resultado.message} Se procesaron <strong>{resultado.total}</strong> artículos.
+          </p>
           
           <div style={styles.codeBlockWithScroll}>
             <pre style={{ margin: 0, fontFamily: 'monospace' }}>

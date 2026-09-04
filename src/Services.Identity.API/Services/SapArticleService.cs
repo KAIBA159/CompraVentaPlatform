@@ -1,16 +1,26 @@
 ﻿using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 using Services.Identity.API.DTOs;
 
 namespace Services.Identity.API.Services
 {
     public class SapArticleService
     {
+        // 1. Añadimos la variable privada para almacenar la configuración de SAP
+        private readonly SapSettings _sapSettings;
+
         private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = null // OBLIGATORIO: Mantiene estrictamente PascalCase para SAP
         };
+
+        // 2. Añadimos el constructor para inyectar IOptions<SapSettings>
+        public SapArticleService(IOptions<SapSettings> sapSettings)
+        {
+            _sapSettings = sapSettings.Value;
+        }
 
         // ==============================================================================
         // 1. CREAR ARTÍCULO SIMPLE
@@ -49,7 +59,6 @@ namespace Services.Identity.API.Services
                     ItemPrices = itemPrices
                 };
 
-                // Uso de ruta relativa. El Controller pone el https://.../b1s/v1/
                 var response = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
 
                 if (!response.IsSuccessStatusCode)
@@ -88,7 +97,6 @@ namespace Services.Identity.API.Services
                     patchPayload["ItemPrices"] = item.Precios.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList();
                 }
 
-                // REGLAS: Artículos Simples
                 patchPayload["WTLiable"] = "tYES";
                 patchPayload["VatLiable"] = "tYES";
                 patchPayload["IndirectTax"] = "tYES";
@@ -122,7 +130,6 @@ namespace Services.Identity.API.Services
 
                 var itemPrices = item.Precios?.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList() ?? new();
 
-                // 1. Payload del Artículo Padre (Combo)
                 var itemPayload = new
                 {
                     ItemCode = item.ItemCode,
@@ -130,12 +137,10 @@ namespace Services.Identity.API.Services
                     ItemType = item.ItemType ?? "I",
                     ItemsGroupCode = item.ItemsGroupCode,
 
-                    // REGLA: Combos -> Impuesto Indirecto en NO
                     WTLiable = "tYES",
                     VatLiable = "tYES",
                     IndirectTax = "tNO",
 
-                    // REGLA: Logística de Combos
                     InventoryItem = "tNO",
                     SalesItem = "tYES",
                     PurchaseItem = "tNO",
@@ -153,7 +158,6 @@ namespace Services.Identity.API.Services
                 if (!responseItem.IsSuccessStatusCode)
                     return (false, $"Error al crear artículo padre: {await responseItem.Content.ReadAsStringAsync()}");
 
-                // 2. Payload para la Lista de Materiales (BOM)
                 var treeLines = item.Componentes.Select(c => new
                 {
                     ItemCode = c.ItemCode,
@@ -207,7 +211,6 @@ namespace Services.Identity.API.Services
                     patchPayload["ItemPrices"] = item.Precios.Select(p => new { PriceList = p.PriceListId, Price = p.Price }).ToList();
                 }
 
-                // REGLAS: Combos (Se fuerza el NO en el Impuesto Indirecto)
                 patchPayload["WTLiable"] = "tYES";
                 patchPayload["VatLiable"] = "tYES";
                 patchPayload["IndirectTax"] = "tNO";
@@ -251,6 +254,170 @@ namespace Services.Identity.API.Services
                 return (false, $"Excepción interna: {ex.Message}");
             }
         }
+
+        // ==============================================================================
+        // 5. ACTUALIZAR FABRICANTE Y PAÍS DE ORIGEN
+        // ==============================================================================
+        public async Task<string> ActualizarFabricanteYPaisAsync(ActualizarFabricantePaisDto dto, string sessionCookie)
+        {
+            var updatePayload = new
+            {
+                Manufacturer = dto.Manufacturer,
+                ItemIntrastatExtension = new
+                {
+                    ItemCode = dto.ItemCode, // <-- OBLIGATORIO: Llave primaria en el sub-objeto
+                    CountryOfOrigin = dto.CountryOfOrigin
+                }
+            };
+
+            // ... (resto del código HttpClient sin modificaciones)
+            var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (m, c, ch, e) => true };
+            using var client = new HttpClient(handler);
+            client.BaseAddress = new Uri(_sapSettings.Server);
+            client.DefaultRequestHeaders.Add("Cookie", $"B1SESSION={sessionCookie}");
+
+            var response = await client.PatchAsJsonAsync($"Items('{dto.ItemCode}')", updatePayload, _jsonOptions);
+
+
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Fallo al actualizar {dto.ItemCode}: {errorContent}");
+            }
+
+            return $"El artículo {dto.ItemCode} fue actualizado correctamente.";
+        }
+
+
+        public async Task<string> ActualizarPrecioEspecificoAsync(ActualizarPrecioListaDto dto, string sessionCookie, Func<Task<string>> renovarSesionFunc = null)
+        {
+            if (dto.Price <= 0)
+                throw new Exception($"El precio para el artículo {dto.ItemCode} es 0 o inválido. Revisa el Excel.");
+
+            var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (m, c, ch, e) => true };
+            using var client = new HttpClient(handler) { BaseAddress = new Uri(_sapSettings.Server) };
+            client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
+
+            var itemCodeSeguro = Uri.EscapeDataString(dto.ItemCode);
+            var response = await client.GetAsync($"Items('{itemCodeSeguro}')?$select=ItemCode,ItemPrices");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+
+                if (errorContent.Contains("301") && renovarSesionFunc != null)
+                {
+                    sessionCookie = await renovarSesionFunc();
+                    client.DefaultRequestHeaders.Remove("Cookie");
+                    client.DefaultRequestHeaders.Add("Cookie", sessionCookie);
+
+                    response = await client.GetAsync($"Items('{itemCodeSeguro}')?$select=ItemCode,ItemPrices");
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        errorContent = await response.Content.ReadAsStringAsync();
+                        throw new Exception($"Fallo GET SAP tras reautenticar ({response.StatusCode}): {errorContent}");
+                    }
+                }
+                else
+                {
+                    throw new Exception($"Fallo GET SAP ({response.StatusCode}): {errorContent}");
+                }
+            }
+
+            var itemData = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+            JsonElement itemPricesElement = default;
+            bool foundPrices = false;
+
+            foreach (var prop in itemData.EnumerateObject())
+            {
+                if (prop.Name.Equals("ItemPrices", StringComparison.OrdinalIgnoreCase))
+                {
+                    itemPricesElement = prop.Value;
+                    foundPrices = true;
+                    break;
+                }
+            }
+
+            int realLineNum = -1;
+
+            if (foundPrices && itemPricesElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var priceRow in itemPricesElement.EnumerateArray())
+                {
+                    int priceListVal = -1;
+                    int lineNumVal = -1;
+
+                    foreach (var rowProp in priceRow.EnumerateObject())
+                    {
+                        if (rowProp.Name.Equals("PriceList", StringComparison.OrdinalIgnoreCase))
+                            priceListVal = rowProp.Value.GetInt32();
+
+                        if (rowProp.Name.Equals("LineNum", StringComparison.OrdinalIgnoreCase))
+                            lineNumVal = rowProp.Value.GetInt32();
+                    }
+
+                    if (priceListVal == dto.PriceListId)
+                    {
+                        realLineNum = lineNumVal;
+                        break;
+                    }
+                }
+            }
+
+            // PAYLOAD CONDICIONAL: Si existe LineNum se envía; si no, se omite para forzar la creación en SAP
+            object updatePayload;
+            if (realLineNum != -1)
+            {
+                updatePayload = new
+                {
+                    ItemPrices = new[]
+                    {
+                new
+                {
+                    LineNum = realLineNum,
+                    PriceList = dto.PriceListId,
+                    Price = dto.Price,
+                    Currency = dto.Currency
+                }
+            }
+                };
+            }
+            else
+            {
+                updatePayload = new
+                {
+                    ItemPrices = new[]
+                    {
+                new
+                {
+                    PriceList = dto.PriceListId,
+                    Price = dto.Price,
+                    Currency = dto.Currency
+                }
+            }
+                };
+            }
+
+            var patchResponse = await client.PatchAsJsonAsync($"Items('{itemCodeSeguro}')", updatePayload, _jsonOptions);
+
+            if (!patchResponse.IsSuccessStatusCode)
+            {
+                var patchError = await patchResponse.Content.ReadAsStringAsync();
+                throw new Exception($"Fallo interno en SAP al guardar el precio: {patchError}");
+            }
+
+            return $"Precio actualizado exitosamente a {dto.Currency} {dto.Price}";
+        }
+
+
+
+
+
+
+
+
 
         private void EnsureCookie(HttpClient client, string sessionCookie)
         {

@@ -64,6 +64,38 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "Services.Identity.API.Controllers.ArticlesController",
+    "Method": "ActualizarFabricantePaisMasivo",
+    "RelativePath": "api/Articles/update-manufacturer",
+    "HttpMethod": "PATCH",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "payload",
+        "Type": "System.Collections.Generic.List\u00601[[Services.Identity.API.DTOs.ActualizarFabricantePaisDto, Services.Identity.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "Services.Identity.API.Controllers.ArticlesController",
+    "Method": "ActualizarPrecioListaMasivo",
+    "RelativePath": "api/Articles/update-price",
+    "HttpMethod": "PATCH",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "payload",
+        "Type": "System.Collections.Generic.List\u00601[[Services.Identity.API.DTOs.ActualizarPrecioListaDto, Services.Identity.API, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "Services.Identity.API.Controllers.AuthController",
     "Method": "Login",
     "RelativePath": "api/Auth/login",

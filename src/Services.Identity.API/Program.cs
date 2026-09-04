@@ -55,7 +55,12 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTransient<SapServiceLayerAuth>();
+//builder.Services.AddTransient<SapArticleService>();
+
+
 builder.Services.AddTransient<SapArticleService>();
+builder.Services.AddTransient<SapSocioNegocioService>(); // <--- Agrega esta línea
+
 
 var app = builder.Build();
 
