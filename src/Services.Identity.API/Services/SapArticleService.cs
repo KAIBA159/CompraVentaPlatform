@@ -137,6 +137,13 @@ namespace Services.Identity.API.Services
                     ItemType = item.ItemType ?? "I",
                     ItemsGroupCode = item.ItemsGroupCode,
 
+
+                    // --- NUEVOS CAMPOS INYECTADOS AQUÍ ---
+                    Valid = item.Valid,
+                    ValidTo = item.ValidTo,
+                    // -------------------------------------
+
+
                     WTLiable = "tYES",
                     VatLiable = "tYES",
                     IndirectTax = "tNO",
@@ -200,6 +207,12 @@ namespace Services.Identity.API.Services
 
                 if (!string.IsNullOrWhiteSpace(item.ItemName)) patchPayload["ItemName"] = item.ItemName;
                 if (item.ItemsGroupCode > 0) patchPayload["ItemsGroupCode"] = item.ItemsGroupCode;
+
+                // --- NUEVOS CAMPOS INYECTADOS AQUÍ ---
+                if (!string.IsNullOrWhiteSpace(item.Valid)) patchPayload["Valid"] = item.Valid;
+                if (!string.IsNullOrWhiteSpace(item.ValidTo)) patchPayload["ValidTo"] = item.ValidTo;
+                // -------------------------------------
+
                 if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOEXIS)) patchPayload["U_EXX_TIPOEXIS"] = item.U_EXX_TIPOEXIS;
                 if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOUMED)) patchPayload["U_EXX_TIPOUMED"] = item.U_EXX_TIPOUMED;
                 if (!string.IsNullOrWhiteSpace(item.U_EXM_PERCOM)) patchPayload["U_EXM_PERCOM"] = item.U_EXM_PERCOM;

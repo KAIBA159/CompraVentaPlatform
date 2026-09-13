@@ -15,6 +15,11 @@
         public string U_EXM_ESTOBS { get; set; }
         public string U_MKA_TINCOS { get; set; }
 
+        // --- NUEVOS CAMPOS DE VIGENCIA ---
+        public string Valid { get; set; } = "tYES"; // Por defecto activo en SAP
+        public string? ValidTo { get; set; }        // Nullable por si no tiene caducidad
+        // ---------------------------------
+
 
         //public string WTLiable { get; set; }
         //public string VATLiable { get; set; }

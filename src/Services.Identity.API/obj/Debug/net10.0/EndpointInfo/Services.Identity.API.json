@@ -370,6 +370,14 @@
             "type": "string",
             "nullable": true
           },
+          "valid": {
+            "type": "string",
+            "nullable": true
+          },
+          "validTo": {
+            "type": "string",
+            "nullable": true
+          },
           "precios": {
             "type": "array",
             "items": {
@@ -427,6 +435,14 @@
             "nullable": true
           },
           "u_MKA_TINCOS": {
+            "type": "string",
+            "nullable": true
+          },
+          "valid": {
+            "type": "string",
+            "nullable": true
+          },
+          "validTo": {
             "type": "string",
             "nullable": true
           },
