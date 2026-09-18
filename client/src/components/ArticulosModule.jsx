@@ -19,6 +19,16 @@ export default function ArticulosModule({ onBack }) {
     }
   };
 
+  // Utilidad para formatear fechas de caducidad (YYYYMMDD a YYYY-MM-DD)
+  const formatValidToDate = (dateRaw) => {
+    if (!dateRaw) return null;
+    const strDate = String(dateRaw).trim();
+    if (strDate.length === 8 && /^\d+$/.test(strDate)) {
+      return `${strDate.substring(0, 4)}-${strDate.substring(4, 6)}-${strDate.substring(6, 8)}`;
+    }
+    return strDate;
+  };
+
   const handleProcessUpload = async (e) => {
     e.preventDefault();
     if (!file) {
@@ -43,61 +53,14 @@ export default function ArticulosModule({ onBack }) {
         const buffer = evt.target.result;
         const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
 
-        // 1. CORRECCIÓN: Apuntar primero a la pestaña exacta del Excel
-        const ws = wb.Sheets["LISTA MAKITA BRASIL"] || wb.Sheets["Articulos"] || wb.Sheets[wb.SheetNames[0]];
-
+        // Ubicar la hoja correcta dinámicamente
+        const ws = wb.Sheets["LISTA MAKITA BRASIL"] || wb.Sheets["LISTA MAKITA BOLIVIA"] || wb.Sheets["Articulos"] || wb.Sheets[wb.SheetNames[0]];
         const rawData = XLSX.utils.sheet_to_json(ws);
+        
         let payloadFinal = [];
 
         // ====================================================================
-        // LÓGICA 1: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS
-        // ====================================================================
-        if (tipoOperacion === 'actualizarPrecioBrasil') {
-          payloadFinal = rawData.map(row => {
-            // 2. CORRECCIÓN: Búsqueda estricta de "PrecioBrasil" blindada contra espacios
-            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
-            const keyPrecio = Object.keys(row).find(k => k.trim().toLowerCase() === 'preciobrasil');
-
-            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
-            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
-
-            // Extrae únicamente el valor numérico, eliminando "USD "
-            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
-            const precioFinal = parseFloat(precioLimpio) || 0;
-
-            return {
-              ItemCode: String(itemCodeRaw).trim(),
-              PriceListId: 16,
-              Price: precioFinal,
-              Currency: "USD" 
-            };
-          }).filter(item => item.ItemCode !== '' && item.Price > 0);
-
-        // ====================================================================
-        // LÓGICA 2: MAESTRO COMPLETO (SIMPLES O COMBOS)
-        // ====================================================================
-        //} else {
-// ... mantén el resto de tu código intacto a partir de aquí
-
-
-    /*
-    reader.onload = async (evt) => {
-      try {
-        const buffer = evt.target.result;
-        const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' });
-
-        const nombreHoja = "Articulos";
-        const ws = wb.Sheets[nombreHoja] || wb.Sheets[wb.SheetNames[0]];
-
-        if (!wb.Sheets[nombreHoja]) {
-          console.warn(`⚠️ No se encontró la hoja "${nombreHoja}". Se usó la primera pestaña.`);
-        }
-
-        const rawData = XLSX.utils.sheet_to_json(ws);
-        let payloadFinal = [];
-
-        // ====================================================================
-        // LÓGICA 1: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (NUEVO)
+        // LÓGICA 1A: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (BRASIL - 16)
         // ====================================================================
         if (tipoOperacion === 'actualizarPrecioBrasil') {
           payloadFinal = rawData.map(row => {
@@ -109,20 +72,41 @@ export default function ArticulosModule({ onBack }) {
 
             const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
             const precioRaw = keyPrecio ? row[keyPrecio] : '0';
-
-            const precioLimpio = String(precioRaw || '0').replace(/[^\d.-]/g, '');
-            const precioFinal = parseFloat(precioLimpio) || 0;
-
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            
             return {
               ItemCode: String(itemCodeRaw).trim(),
               PriceListId: 16,
-              Price: precioFinal,
+              Price: parseFloat(precioLimpio) || 0,
               Currency: "USD" 
             };
           }).filter(item => item.ItemCode !== '' && item.Price > 0);
-          */
+
         // ====================================================================
-        // LÓGICA 2: MAESTRO COMPLETO (SIMPLES O COMBOS) - ORIGINAL
+        // LÓGICA 1B: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (BOLIVIA - 8)
+        // ====================================================================
+        } else if (tipoOperacion === 'actualizarPrecioBolivia') {
+          payloadFinal = rawData.map(row => {
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            const keyPrecio = Object.keys(row).find(k => {
+               const lowerK = k.trim().toLowerCase();
+               return lowerK === 'preciobolivia' || lowerK === 'lista makita bolivia';
+            });
+
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              PriceListId: 8, // ID EXACTO PARA BOLIVIA
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+        // ====================================================================
+        // LÓGICA 2: MAESTRO COMPLETO (SIMPLES O COMBOS)
         // ====================================================================
         } else {
           const articulosMap = {};
@@ -153,18 +137,24 @@ export default function ArticulosModule({ onBack }) {
                 itemName: row.ItemName ? String(row.ItemName) : '',
                 itemType: row.ItemType ? String(row.ItemType) : 'I',
                 itemsGroupCode: row.ItemsGroupCode ? Number(row.ItemsGroupCode) : 0,
-                treeType: row.TipoLMat ? String(row.TipoLMat) : 'iSales',
+                
+                // Vigencia y UDFs
+                valid: row.Valid ? String(row.Valid) : 'tYES',
+                validTo: formatValidToDate(row.ValidTo),
                 u_EXX_TIPOEXIS: row.U_EXX_TIPOEXIS ? String(row.U_EXX_TIPOEXIS) : '',
                 u_EXX_TIPOUMED: row.U_EXX_TIPOUMED ? String(row.U_EXX_TIPOUMED) : '',
                 u_EXM_PERCOM: row.U_EXM_PERCOM ? String(row.U_EXM_PERCOM) : '',
                 u_EXM_ESTOBS: row.U_EXM_ESTOBS ? String(row.U_EXM_ESTOBS) : '',
                 u_MKA_TINCOS: row.U_MKA_TINCOS ? String(row.U_MKA_TINCOS) : '',
+                
+                treeType: row.TipoLMat ? String(row.TipoLMat) : 'iSales',
                 esCombo: tipoEstructura === 'con_bom' || String(row.Tipo || '').toUpperCase() === 'COMBO',
                 precios: preciosList,
                 componentes: []
               };
             }
 
+            // Si es un BOM, extraer sus componentes
             if (tipoEstructura === 'con_bom' && row.Componente_Code) {
               articulosMap[itemCode].componentes.push({
                 itemCode: String(row.Componente_Code),
@@ -179,7 +169,7 @@ export default function ArticulosModule({ onBack }) {
         const totalRegistros = payloadFinal.length;
 
         if (totalRegistros === 0) {
-          alert('No se encontraron registros válidos para procesar o los precios detectados son cero.');
+          alert('No se encontraron registros válidos para procesar.');
           setLoading(false);
           return;
         }
@@ -189,11 +179,11 @@ export default function ArticulosModule({ onBack }) {
         // ====================================================================
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5243';
         let endpointDestino = '';
-        let metodoHttp = 'POST'; // Por defecto los maestros usan POST en tu backend
+        let metodoHttp = 'POST';
 
-        if (tipoOperacion === 'actualizarPrecioBrasil') {
+        if (tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') {
           endpointDestino = `${baseUrl}/api/Articles/update-price`;
-          metodoHttp = 'PATCH'; // CRÍTICO: El endpoint de precios exige PATCH
+          metodoHttp = 'PATCH'; 
         } else if (tipoEstructura === 'simple') {
           endpointDestino = tipoOperacion === 'crear' 
             ? `${baseUrl}/api/Articles/crear-masivo-simples` 
@@ -204,7 +194,9 @@ export default function ArticulosModule({ onBack }) {
             : `${baseUrl}/api/Articles/actualizar-masivo-combos`;
         }
 
-        // ESTRATEGIA DE LOTES (BLOQUES DE 50)
+        // ====================================================================
+        // EJECUCIÓN POR LOTES (BATCH PROCESSING)
+        // ====================================================================
         const tamanoBloque = 50;
         let detallesAcumulados = [];
 
@@ -218,7 +210,7 @@ export default function ArticulosModule({ onBack }) {
 
           try {
             const response = await fetch(endpointDestino, {
-              method: metodoHttp, // Se inyecta PATCH o POST dinámicamente
+              method: metodoHttp,
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(bloque)
             });
@@ -287,7 +279,7 @@ export default function ArticulosModule({ onBack }) {
                 name="tipoEstructura" 
                 checked={tipoEstructura === 'simple'} 
                 onChange={() => setTipoEstructura('simple')} 
-                disabled={tipoOperacion === 'actualizarPrecioBrasil'}
+                disabled={tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia'}
               />
               📦 Artículos / Producto Simple
             </label>
@@ -297,7 +289,7 @@ export default function ArticulosModule({ onBack }) {
                 name="tipoEstructura" 
                 checked={tipoEstructura === 'con_bom'} 
                 onChange={() => setTipoEstructura('con_bom')} 
-                disabled={tipoOperacion === 'actualizarPrecioBrasil'}
+                disabled={tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia'}
               />
               🔗 Artículos / Combos (Lista Materiales)
             </label>
@@ -325,7 +317,6 @@ export default function ArticulosModule({ onBack }) {
               />
               🔄 Actualizar Registros Existentes
             </label>
-            {/* AQUÍ ESTÁ EL TERCER BOTÓN AÑADIDO */}
             <label style={styles.radioLabel}>
               <input 
                 type="radio" 
@@ -333,10 +324,22 @@ export default function ArticulosModule({ onBack }) {
                 checked={tipoOperacion === 'actualizarPrecioBrasil'} 
                 onChange={() => {
                   setTipoOperacion('actualizarPrecioBrasil');
-                  setTipoEstructura('simple'); // Fuerza a 'simple' al seleccionar precios
+                  setTipoEstructura('simple');
                 }} 
               />
               💲 Actualizar Precio (Lista Brasil - 16)
+            </label>
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizarPrecioBolivia'} 
+                onChange={() => {
+                  setTipoOperacion('actualizarPrecioBolivia');
+                  setTipoEstructura('simple');
+                }} 
+              />
+              💲 Actualizar Precio (Lista Bolivia - 8)
             </label>
           </div>
         </div>
@@ -363,7 +366,7 @@ export default function ArticulosModule({ onBack }) {
 
         {file && !loading && (
           <button type="submit" style={styles.submitBtn}>
-            Ejecutar {tipoOperacion === 'actualizarPrecioBrasil' ? 'ACTUALIZACIÓN DE PRECIOS' : `${tipoOperacion.toUpperCase()} Masiva`} en Lotes
+            Ejecutar {(tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') ? 'ACTUALIZACIÓN DE PRECIOS' : `${tipoOperacion.toUpperCase()} Masiva`} en Lotes
           </button>
         )}
 

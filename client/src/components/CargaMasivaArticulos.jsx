@@ -52,6 +52,8 @@ export default function CargaMasivaArticulos() {
 
         // 2. LÓGICA: ACTUALIZAR LISTA BRASIL
         } else if (operacion === 'actualizarPrecioBrasil') {
+
+
           const payloadBackend = excelData.map(row => {
             const precioLimpio = String(row.PrecioBrasil || '0').replace(/[^\d.-]/g, '');
             return {
@@ -76,6 +78,39 @@ export default function CargaMasivaArticulos() {
             mensaje: `✅ ¡Excelente trabajo! 📦 Acabas de actualizar el precio de ${payloadBackend.length} artículos en la Lista 16.`, 
             detalles: response 
           });
+
+          
+          // --- 3. NUEVA LÓGICA: ACTUALIZAR LISTA BOLIVIA ---
+        } else if (operacion === 'actualizarPrecioBolivia') {
+          const payloadBackend = excelData.map(row => {
+            // Nota: Lee la columna "PrecioBolivia". Si en el Excel la columna se llama diferente, ajusta este nombre.
+            const precioLimpio = String(row.PrecioBolivia || '0').replace(/[^\d.-]/g, '');
+            return {
+              ItemCode: String(row.ItemCode || '').trim(),
+              PriceListId: 8, // ID estricto para la lista de Bolivia en SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+          if (payloadBackend.length === 0) {
+            setEstadoCarga({ 
+                cargando: false, 
+                mensaje: '❌ Error: No se encontraron artículos válidos o los precios detectados son cero. Revise que la columna en el Excel se llame "PrecioBolivia".' 
+            });
+            return;
+          }
+
+          const response = await articulosService.actualizarPrecioLista(payloadBackend);
+          setEstadoCarga({ 
+            cargando: false, 
+            mensaje: `✅ ¡Excelente trabajo! 📦 Acabas de actualizar el precio de ${payloadBackend.length} artículos en la Lista 8 (Bolivia).`, 
+            detalles: response 
+          });
+        // -------------------------------------------------
+
+
+
 
         // 3. LÓGICA: CREAR NUEVOS REGISTROS
         } else if (operacion === 'crear') {
@@ -125,14 +160,26 @@ export default function CargaMasivaArticulos() {
               <input type="radio" name="operacion" checked={operacion === 'crear'} onChange={() => setOperacion('crear')} />
               ➕ Crear Nuevos Registros
             </label>
+
             <label style={styles.radioLabel}>
               <input type="radio" name="operacion" checked={operacion === 'actualizar'} onChange={() => setOperacion('actualizar')} />
               🔄 Actualizar Fabricante / País
             </label>
+
             <label style={styles.radioLabel}>
               <input type="radio" name="operacion" checked={operacion === 'actualizarPrecioBrasil'} onChange={() => setOperacion('actualizarPrecioBrasil')} />
               💲 Actualizar Precio (Lista Brasil - 16)
             </label>
+
+            {/* --- NUEVO RADIO BUTTON PARA BOLIVIA AÑADIDO AQUÍ --- */}
+            <label style={styles.radioLabel}>
+              <input type="radio" name="operacion" checked={operacion === 'actualizarPrecioBolivia'} onChange={() => setOperacion('actualizarPrecioBolivia')} />
+              💲 Actualizar Precio (Lista Bolivia - 8)
+            </label>
+            {/* -------------------------------------------------- */}
+
+
+
           </div>
         </div>
 
