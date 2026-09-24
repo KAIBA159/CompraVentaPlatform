@@ -46,7 +46,7 @@
         public string? TreeType { get; set; }
         public List<ComponenteBOMDto> Componentes { get; set; } = new();
     }
-
+    //hola itamar
     // 3. CLASES DE APOYO 
     public class PrecioItemDto
     {

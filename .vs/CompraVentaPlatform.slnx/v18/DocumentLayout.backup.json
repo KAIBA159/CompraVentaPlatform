@@ -3,6 +3,10 @@
   "WorkspaceRootPath": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|c:\\users\\sistemas2\\documents\\jsolis\\desarrollo\\2_web_utilidades\\compraventaplatform\\src\\services.identity.api\\dtos\\articulosimplemigraciondto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|solutionrelative:src\\services.identity.api\\dtos\\articulosimplemigraciondto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|c:\\users\\sistemas2\\documents\\jsolis\\desarrollo\\2_web_utilidades\\compraventaplatform\\src\\services.identity.api\\services\\saparticleservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|solutionrelative:src\\services.identity.api\\services\\saparticleservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
@@ -17,10 +21,6 @@
     {
       "AbsoluteMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|c:\\users\\sistemas2\\documents\\jsolis\\desarrollo\\2_web_utilidades\\compraventaplatform\\src\\services.identity.api\\dtos\\sapsettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|solutionrelative:src\\services.identity.api\\dtos\\sapsettings.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|c:\\users\\sistemas2\\documents\\jsolis\\desarrollo\\2_web_utilidades\\compraventaplatform\\src\\services.identity.api\\dtos\\articulosimplemigraciondto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|solutionrelative:src\\services.identity.api\\dtos\\articulosimplemigraciondto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{F05E3F4F-D76D-ECEA-B24C-418D23823872}|src\\Services.Identity.API\\Services.Identity.API.csproj|c:\\users\\sistemas2\\documents\\jsolis\\desarrollo\\2_web_utilidades\\compraventaplatform\\src\\services.identity.api\\dtos\\actualizarfabricantepaisdto.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
@@ -58,47 +58,33 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 0,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 1,
               "Title": "SapArticleService.cs",
               "DocumentMoniker": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\Services\\SapArticleService.cs",
               "RelativeDocumentMoniker": "src\\Services.Identity.API\\Services\\SapArticleService.cs",
               "ToolTip": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\Services\\SapArticleService.cs",
               "RelativeToolTip": "src\\Services.Identity.API\\Services\\SapArticleService.cs",
-              "ViewState": "AgIAAJsBAAAAAAAAAAAkwLoBAAABAAAAAAAAAA==",
+              "ViewState": "AgIAAJABAAAAAAAAAAAowKkBAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-08-19T14:57:44.002Z",
-              "IsPinned": true,
-              "EditorCaption": ""
+              "IsPinned": true
             },
             {
               "$type": "Document",
-              "DocumentIndex": 4,
+              "DocumentIndex": 0,
               "Title": "ArticuloSimpleMigracionDto.cs",
               "DocumentMoniker": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\ArticuloSimpleMigracionDto.cs",
               "RelativeDocumentMoniker": "src\\Services.Identity.API\\DTOs\\ArticuloSimpleMigracionDto.cs",
               "ToolTip": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\ArticuloSimpleMigracionDto.cs",
               "RelativeToolTip": "src\\Services.Identity.API\\DTOs\\ArticuloSimpleMigracionDto.cs",
-              "ViewState": "AgIAACwAAAAAAAAAAADwvzUAAAAqAAAAAAAAAA==",
+              "ViewState": "AgIAACMAAAAAAAAAAAAswDAAAAARAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2026-09-09T20:16:26.338Z",
               "IsPinned": true,
-              "EditorCaption": ""
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "SocioNegocioDto.cs",
-              "DocumentMoniker": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
-              "RelativeDocumentMoniker": "src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
-              "ToolTip": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
-              "RelativeToolTip": "src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-17T20:39:32.534Z",
               "EditorCaption": ""
             },
             {
@@ -139,7 +125,19 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 3,
+              "Title": "SocioNegocioDto.cs",
+              "DocumentMoniker": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
+              "RelativeDocumentMoniker": "src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
+              "ToolTip": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
+              "RelativeToolTip": "src\\Services.Identity.API\\DTOs\\SocioNegocioDto.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-09-17T20:39:32.534Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
               "Title": "ActualizarPrecioListaDto.cs",
               "DocumentMoniker": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\ActualizarPrecioListaDto.cs",
               "RelativeDocumentMoniker": "src\\Services.Identity.API\\DTOs\\ActualizarPrecioListaDto.cs",
@@ -147,12 +145,11 @@
               "RelativeToolTip": "src\\Services.Identity.API\\DTOs\\ActualizarPrecioListaDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAAAqAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-03T20:59:15.043Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-03T20:59:15.043Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 4,
               "Title": "SapSettings.cs",
               "DocumentMoniker": "C:\\Users\\SISTEMAS2\\Documents\\JSOLIS\\DESARROLLO\\2_WEB_UTILIDADES\\CompraVentaPlatform\\src\\Services.Identity.API\\DTOs\\SapSettings.cs",
               "RelativeDocumentMoniker": "src\\Services.Identity.API\\DTOs\\SapSettings.cs",
@@ -160,8 +157,7 @@
               "RelativeToolTip": "src\\Services.Identity.API\\DTOs\\SapSettings.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAkAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-08-31T16:44:28.766Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-08-31T16:44:28.766Z"
             },
             {
               "$type": "Document",
@@ -173,8 +169,7 @@
               "RelativeToolTip": "src\\Services.Identity.API\\DTOs\\ActualizarFabricantePaisDto.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAcAAABmAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2026-09-03T19:07:23.311Z",
-              "EditorCaption": ""
+              "WhenOpened": "2026-09-03T19:07:23.311Z"
             },
             {
               "$type": "Document",
