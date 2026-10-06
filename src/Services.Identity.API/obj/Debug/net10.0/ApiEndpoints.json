@@ -96,6 +96,22 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "Services.Identity.API.Controllers.ArticlesController",
+    "Method": "UploadExcelFabricantePais",
+    "RelativePath": "api/Articles/upload-excel-fabricante",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "file",
+        "Type": "Microsoft.AspNetCore.Http.IFormFile",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "Services.Identity.API.Controllers.AuthController",
     "Method": "Login",
     "RelativePath": "api/Auth/login",

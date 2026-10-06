@@ -1,6 +1,6 @@
 // Archivo: src/components/CargaMasivaArticulos.jsx
 import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
+import * as XLSX from '';
 import { articulosService } from '../services/articulosService'; 
 
 export default function CargaMasivaArticulos() {
@@ -185,8 +185,8 @@ export default function CargaMasivaArticulos() {
 
         <div style={styles.uploadArea}>
           <h3 style={{color: '#ffb300', margin: '0 0 10px 0'}}>📁</h3>
-          <h3 style={{margin: '0 0 15px 0', color: '#444'}}>Seleccione el archivo fuente (.xlsx)</h3>
-          <input type="file" onChange={handleFileChange} accept=".csv, .xlsx, .xls" style={styles.fileInput} id="fileInput" />
+          <h3 style={{margin: '0 0 15px 0', color: '#444'}}>Seleccione el archivo fuente (.)</h3>
+          <input type="file" onChange={handleFileChange} accept=".csv, ., .xls" style={styles.fileInput} id="fileInput" />
         </div>
 
         <button type="submit" style={styles.button} disabled={estadoCarga.cargando || !archivo}>

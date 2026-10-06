@@ -106,6 +106,47 @@ export default function ArticulosModule({ onBack }) {
           }).filter(item => item.ItemCode !== '' && item.Price > 0);
 
         // ====================================================================
+        // LÓGICA 1C: ACTUALIZACIÓN EXCLUSIVA DE FABRICANTE Y PAÍS
+        // ====================================================================
+        } else if (tipoOperacion === 'actualizarFabricantePais') {
+          payloadFinal = rawData.map(row => {
+            // Buscamos las llaves en crudo (ignorando mayúsculas/minúsculas y espacios)
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            const keyFirmCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'firmcode' || k.trim().toLowerCase() === 'fabricante');
+            const keyIsoOriCntry = Object.keys(row).find(k => k.trim().toLowerCase() === 'isoricntry' || k.trim().toLowerCase() === 'país/región de origen');
+            
+            // NUEVO: Buscar la columna U_MKA_CIF
+            const keyMkaCif = Object.keys(row).find(k => k.trim().toLowerCase() === 'u_mka_cif');
+
+            // Extraemos los valores en crudo
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const firmCodeRaw = keyFirmCode ? row[keyFirmCode] : null;
+            const isoOriCntryRaw = keyIsoOriCntry ? row[keyIsoOriCntry] : null;
+            const mkaCifRaw = keyMkaCif ? row[keyMkaCif] : null;
+
+            // Retornamos el DTO que espera el backend
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              Manufacturer: firmCodeRaw && String(firmCodeRaw).trim() !== '' ? parseInt(String(firmCodeRaw).trim(), 10) : null,
+              CountryOfOrigin: isoOriCntryRaw && String(isoOriCntryRaw).trim() !== '' ? String(isoOriCntryRaw).trim() : null,
+              // NUEVO: Asignar el valor del UDF
+              U_MKA_CIF: mkaCifRaw && String(mkaCifRaw).trim() !== '' ? String(mkaCifRaw).trim() : null
+            };
+          }).filter(item => {
+              // CORRECCIÓN DEL BUG: 
+              // Se procesa la fila SIEMPRE QUE tenga un ItemCode Y al menos uno de los otros campos NO sea null.
+              // En tu Excel de prueba, Manufacturer y CountryOfOrigin son null, pero U_MKA_CIF tiene valor.
+              return item.ItemCode !== '' && (
+                  item.Manufacturer !== null || 
+                  item.CountryOfOrigin !== null || 
+                  item.U_MKA_CIF !== null
+              );
+          });
+
+
+
+
+        // ====================================================================
         // LÓGICA 2: MAESTRO COMPLETO (SIMPLES O COMBOS)
         // ====================================================================
         } else {
@@ -181,10 +222,22 @@ export default function ArticulosModule({ onBack }) {
         let endpointDestino = '';
         let metodoHttp = 'POST';
 
+
+        /*
         if (tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') {
           endpointDestino = `${baseUrl}/api/Articles/update-price`;
           metodoHttp = 'PATCH'; 
         } else if (tipoEstructura === 'simple') {
+            */
+        if (tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') {
+          endpointDestino = `${baseUrl}/api/Articles/update-price`;
+          metodoHttp = 'PATCH'; 
+        } else if (tipoOperacion === 'actualizarFabricantePais') {
+          // NUEVA RUTA: Apunta al endpoint [HttpPatch("update-manufacturer")] que ya tenías en C#
+          endpointDestino = `${baseUrl}/api/Articles/update-manufacturer`;
+          metodoHttp = 'PATCH';
+        } else if (tipoEstructura === 'simple') {
+
           endpointDestino = tipoOperacion === 'crear' 
             ? `${baseUrl}/api/Articles/crear-masivo-simples` 
             : `${baseUrl}/api/Articles/actualizar-masivo-simples`;
@@ -271,8 +324,10 @@ export default function ArticulosModule({ onBack }) {
       {/* PANEL DE CONFIGURACIÓN DUAL */}
       <div style={styles.configGrid}>
         <div style={styles.optionsCard}>
+
           <label style={styles.optionLabel}>1. Seleccione la estructura:</label>
           <div style={styles.radioGroup}>
+
             <label style={styles.radioLabel}>
               <input 
                 type="radio" 
@@ -283,6 +338,8 @@ export default function ArticulosModule({ onBack }) {
               />
               📦 Artículos / Producto Simple
             </label>
+
+
             <label style={styles.radioLabel}>
               <input 
                 type="radio" 
@@ -341,6 +398,22 @@ export default function ArticulosModule({ onBack }) {
               />
               💲 Actualizar Precio (Lista Bolivia - 8)
             </label>
+
+             {/* NUEVA OPCIÓN: FABRICANTE Y PAÍS */}
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizarFabricantePais'} 
+                onChange={() => {
+                  setTipoOperacion('actualizarFabricantePais');
+                  setTipoEstructura('simple');
+                }} 
+              />
+              🏭 Actualizar Fabricante y País (FirmCode / ISOriCntry)
+            </label>     
+
+
           </div>
         </div>
       </div>
@@ -366,7 +439,11 @@ export default function ArticulosModule({ onBack }) {
 
         {file && !loading && (
           <button type="submit" style={styles.submitBtn}>
-            Ejecutar {(tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') ? 'ACTUALIZACIÓN DE PRECIOS' : `${tipoOperacion.toUpperCase()} Masiva`} en Lotes
+            Ejecutar {
+              (tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') ? 'ACTUALIZACIÓN DE PRECIOS' :
+              (tipoOperacion === 'actualizarFabricantePais') ? 'ACTUALIZACIÓN DE FABRICANTE/PAÍS' :
+              `${tipoOperacion.toUpperCase()} Masiva`
+            } en Lotes
           </button>
         )}
 

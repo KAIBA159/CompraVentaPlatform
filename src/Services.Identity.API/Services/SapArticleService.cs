@@ -1,8 +1,9 @@
-﻿using System.Net.Http.Json;
+﻿using Microsoft.Extensions.Options;
+using Services.Identity.API.DTOs;
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Options;
-using Services.Identity.API.DTOs;
+using System.Text.Json.Serialization;
 
 namespace Services.Identity.API.Services
 {
@@ -160,6 +161,12 @@ namespace Services.Identity.API.Services
                     ItemPrices = itemPrices
                 };
 
+
+
+
+
+
+
                 var responseItem = await client.PostAsJsonAsync("Items", itemPayload, _jsonOptions);
 
                 if (!responseItem.IsSuccessStatusCode)
@@ -194,7 +201,7 @@ namespace Services.Identity.API.Services
         }
 
         // ==============================================================================
-        // 4. ACTUALIZAR ARTÍCULO COMBO + BOM (PATCH)
+        // 4. ACTUALIZAR ARTÍCULO COMBO + BOM (PATCH CON MAPEO DE LINENUM PARA EVITAR DUPLICADOS)
         // ==============================================================================
         public async Task<(bool Exito, string Mensaje)> ActualizarArticuloComboAsync(
             ArticuloComboMigracionDto item, string sessionCookie, HttpClient client)
@@ -208,10 +215,8 @@ namespace Services.Identity.API.Services
                 if (!string.IsNullOrWhiteSpace(item.ItemName)) patchPayload["ItemName"] = item.ItemName;
                 if (item.ItemsGroupCode > 0) patchPayload["ItemsGroupCode"] = item.ItemsGroupCode;
 
-                // --- NUEVOS CAMPOS INYECTADOS AQUÍ ---
                 if (!string.IsNullOrWhiteSpace(item.Valid)) patchPayload["Valid"] = item.Valid;
                 if (!string.IsNullOrWhiteSpace(item.ValidTo)) patchPayload["ValidTo"] = item.ValidTo;
-                // -------------------------------------
 
                 if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOEXIS)) patchPayload["U_EXX_TIPOEXIS"] = item.U_EXX_TIPOEXIS;
                 if (!string.IsNullOrWhiteSpace(item.U_EXX_TIPOUMED)) patchPayload["U_EXX_TIPOUMED"] = item.U_EXX_TIPOUMED;
@@ -237,8 +242,21 @@ namespace Services.Identity.API.Services
                 if (!responseItem.IsSuccessStatusCode)
                     return (false, $"Error al actualizar artículo padre (Combo): {await responseItem.Content.ReadAsStringAsync()}");
 
+
                 if (item.Componentes != null && item.Componentes.Any())
                 {
+                    // 1. ESTRATEGIA "DROP AND RECREATE": ELIMINAR EL BOM EXISTENTE PRIMERO
+                    // Esto limpiará todos los duplicados acumulados en SAP B1
+                    var deleteResponse = await client.DeleteAsync($"ProductTrees('{item.ItemCode}')");
+
+                    // Si el error no es "Success" y tampoco es "Not Found" (404), hubo un error real de borrado.
+                    if (!deleteResponse.IsSuccessStatusCode && deleteResponse.StatusCode != System.Net.HttpStatusCode.NotFound)
+                    {
+                        var deleteError = await deleteResponse.Content.ReadAsStringAsync();
+                        return (false, $"Padre actualizado, pero falló al limpiar el BOM anterior: {deleteError}");
+                    }
+
+                    // 2. CREAR EL BOM DESDE CERO (POST) CON LA DATA FRESCA DEL EXCEL
                     var treeLines = item.Componentes.Select(c => new
                     {
                         ItemCode = c.ItemCode,
@@ -246,19 +264,32 @@ namespace Services.Identity.API.Services
                         Warehouse = "ALM01"
                     }).ToList();
 
-                    var bomPayload = new
+                    var createBomPayload = new
                     {
+                        TreeCode = item.ItemCode,
                         TreeType = item.TreeType ?? "iSales",
                         PriceList = 1,
                         ProductTreeLines = treeLines
                     };
 
-                    var contentBom = new StringContent(JsonSerializer.Serialize(bomPayload, _jsonOptions), Encoding.UTF8, "application/json");
-                    var responseBom = await client.PatchAsync($"ProductTrees('{item.ItemCode}')", contentBom);
+                    var createContent = new StringContent(JsonSerializer.Serialize(createBomPayload, _jsonOptions), Encoding.UTF8, "application/json");
+                    var createResponseBom = await client.PostAsync("ProductTrees", createContent);
 
-                    if (!responseBom.IsSuccessStatusCode)
-                        return (false, $"Padre actualizado, pero falló actualizar la Lista de Materiales: {await responseBom.Content.ReadAsStringAsync()}");
+                    if (!createResponseBom.IsSuccessStatusCode)
+                    {
+                        var createError = await createResponseBom.Content.ReadAsStringAsync();
+                        return (false, $"Padre actualizado, pero falló al crear la nueva Lista de Materiales limpia: {createError}");
+                    }
                 }
+
+
+
+
+
+
+
+
+
 
                 return (true, "Combo y Lista de Materiales actualizados correctamente en SAP B1");
             }
@@ -268,34 +299,91 @@ namespace Services.Identity.API.Services
             }
         }
 
+
+
+
+
+
         // ==============================================================================
         // 5. ACTUALIZAR FABRICANTE Y PAÍS DE ORIGEN
         // ==============================================================================
-        public async Task<string> ActualizarFabricanteYPaisAsync(ActualizarFabricantePaisDto dto, string sessionCookie)
+        public async Task<string> ActualizarFabricanteYPaisAsync(
+    ActualizarFabricantePaisDto dto,
+    string sessionCookie,
+    HttpClient client,
+    Func<Task<string>> renovarSesion) // Nuevo parámetro
         {
-            var updatePayload = new
+            var updatePayload = new Dictionary<string, object>();
+
+            if (dto.Manufacturer.HasValue)
+                updatePayload.Add("Manufacturer", dto.Manufacturer.Value);
+
+            if (!string.IsNullOrWhiteSpace(dto.CountryOfOrigin))
             {
-                Manufacturer = dto.Manufacturer,
-                ItemIntrastatExtension = new
+                updatePayload.Add("ItemIntrastatExtension", new
                 {
-                    ItemCode = dto.ItemCode, // <-- OBLIGATORIO: Llave primaria en el sub-objeto
+                    ItemCode = dto.ItemCode,
                     CountryOfOrigin = dto.CountryOfOrigin
-                }
-            };
+                });
+            }
 
-            // ... (resto del código HttpClient sin modificaciones)
-            var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = (m, c, ch, e) => true };
-            using var client = new HttpClient(handler);
-            client.BaseAddress = new Uri(_sapSettings.Server);
-            client.DefaultRequestHeaders.Add("Cookie", $"B1SESSION={sessionCookie}");
+            // NUEVO CAMPO: Solo se agrega al JSON si NO viene vacío o nulo
+            if (!string.IsNullOrWhiteSpace(dto.U_MKA_CIF))
+            {
+                // El key DEBE ser exactamente el nombre del campo en SAP B1
+                updatePayload.Add("U_MKA_CIF", dto.U_MKA_CIF);
+            }
 
-            var response = await client.PatchAsJsonAsync($"Items('{dto.ItemCode}')", updatePayload, _jsonOptions);
+            // Si el Excel vino vacío para todos los campos, evitamos llamar a SAP
+            if (updatePayload.Count == 0)
+                return $"El artículo {dto.ItemCode} no requirió actualizaciones.";
+
+            var jsonOptions = new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
+            var jsonString = JsonSerializer.Serialize(updatePayload, jsonOptions);
 
 
+            // Función local para generar un nuevo request limpio
+            HttpRequestMessage CrearRequest(string cookie)
+            {
+                var request = new HttpRequestMessage(HttpMethod.Patch, $"Items('{dto.ItemCode}')");
+                request.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
+
+                // CORRECCIÓN VITAL: 'cookie' ya viene estructurada desde tu Auth Service
+                request.Headers.Add("Cookie", cookie);
+                return request;
+            }
+
+
+
+
+
+
+            var initialRequest = CrearRequest(sessionCookie);
+            var response = await client.SendAsync(initialRequest);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
+
+                // Intercepción del Error 301 de la Service Layer
+                if (errorContent.Contains("\"code\" : 301") || response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+                {
+                    // Solicitamos un nuevo login a SAP
+                    string nuevaSesion = await renovarSesion();
+
+                    // Reintento con la nueva cookie
+                    var retryRequest = CrearRequest(nuevaSesion);
+                    response = await client.SendAsync(retryRequest);
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var retryError = await response.Content.ReadAsStringAsync();
+                        throw new Exception($"Fallo en el reintento para {dto.ItemCode}: {retryError}");
+                    }
+
+                    return $"El artículo {dto.ItemCode} fue actualizado tras renovar la sesión 301.";
+                }
+
                 throw new Exception($"Fallo al actualizar {dto.ItemCode}: {errorContent}");
             }
 

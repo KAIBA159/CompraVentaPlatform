@@ -5,6 +5,38 @@
     "version": "1.0"
   },
   "paths": {
+    "/api/Articles/upload-excel-fabricante": {
+      "post": {
+        "tags": [
+          "Articles"
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              },
+              "encoding": {
+                "file": {
+                  "style": "form"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/Articles/crear-masivo-simples": {
       "post": {
         "tags": [
@@ -300,9 +332,14 @@
           },
           "manufacturer": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true
           },
           "countryOfOrigin": {
+            "type": "string",
+            "nullable": true
+          },
+          "u_MKA_CIF": {
             "type": "string",
             "nullable": true
           }

@@ -166,6 +166,11 @@ C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatf
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Services.Identity.API.pdb
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Azure.Core.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Azure.Identity.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\ClosedXML.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\ClosedXML.Parser.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\DocumentFormat.OpenXml.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\DocumentFormat.OpenXml.Framework.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\ExcelNumberFormat.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Microsoft.AspNetCore.OpenApi.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Microsoft.Bcl.AsyncInterfaces.dll
@@ -185,12 +190,15 @@ C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatf
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Microsoft.IdentityModel.Tokens.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Microsoft.OpenApi.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Microsoft.SqlServer.Server.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\RBush.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\SixLabors.Fonts.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Swashbuckle.AspNetCore.Swagger.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerGen.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\Swashbuckle.AspNetCore.SwaggerUI.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\System.ClientModel.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\System.Configuration.ConfigurationManager.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\System.IdentityModel.Tokens.Jwt.dll
+C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\System.IO.Packaging.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\System.Memory.Data.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\System.Security.Cryptography.ProtectedData.dll
 C:\Users\SISTEMAS2\Documents\JSOLIS\DESARROLLO\2_WEB_UTILIDADES\CompraVentaPlatform\src\Services.Identity.API\bin\Debug\net10.0\cs\Microsoft.Data.SqlClient.resources.dll
