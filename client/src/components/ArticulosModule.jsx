@@ -59,6 +59,8 @@ export default function ArticulosModule({ onBack }) {
         
         let payloadFinal = [];
 
+        
+        
         // ====================================================================
         // LÓGICA 1A: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (BRASIL - 16)
         // ====================================================================
@@ -67,13 +69,17 @@ export default function ArticulosModule({ onBack }) {
             const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
             const keyPrecio = Object.keys(row).find(k => {
                const lowerK = k.trim().toLowerCase();
-               return lowerK === 'preciobrasil' || lowerK === 'lista makita brasil';
+               // Esto garantiza que lea tu columna "Brasil" sin importar mayúsculas
+               return lowerK === 'brasil' || lowerK === 'preciobrasil' || lowerK === 'lista makita brasil';
             });
 
             const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
             const precioRaw = keyPrecio ? row[keyPrecio] : '0';
             const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
             
+            // LOG DE DIAGNÓSTICO: Imprimirá en la consola exactamente qué está leyendo
+            console.log("Fila Cruda:", row, " | ItemCode Leído:", itemCodeRaw, " | Precio Leído:", precioRaw, " | Precio Limpio:", precioLimpio);
+
             return {
               ItemCode: String(itemCodeRaw).trim(),
               PriceListId: 16,
@@ -81,6 +87,9 @@ export default function ArticulosModule({ onBack }) {
               Currency: "USD" 
             };
           }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+
+
 
         // ====================================================================
         // LÓGICA 1B: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (BOLIVIA - 8)
@@ -104,6 +113,87 @@ export default function ArticulosModule({ onBack }) {
               Currency: "USD" 
             };
           }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+
+
+        // ====================================================================
+        // LÓGICA: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (CHINA - 14)
+        // ====================================================================
+        } else if (tipoOperacion === 'actualizarPrecioChina') {
+          payloadFinal = rawData.map(row => {
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            // Busca la columna que se llame 'china' en tu Excel
+            const keyPrecio = Object.keys(row).find(k => {
+               const lowerK = k.trim().toLowerCase();
+               return lowerK === 'china' || lowerK === 'preciochina' || lowerK === 'lista makita china';
+            });
+
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              PriceListId: 14, // ID EXACTO PARA CHINA SEGÚN SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);  
+
+
+
+
+        // ====================================================================
+        // LÓGICA 1C: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (JAPAN - 15)
+        // ====================================================================
+        } else if (tipoOperacion === 'actualizarPrecioJapan') {
+          payloadFinal = rawData.map(row => {
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            // Busca la columna que se llame 'japan' o 'preciojapan' o 'lista makita japan'
+            const keyPrecio = Object.keys(row).find(k => {
+               const lowerK = k.trim().toLowerCase();
+               return lowerK === 'japan' || lowerK === 'preciojapan' || lowerK === 'lista makita japan';
+            });
+
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              PriceListId: 15, // ID EXACTO PARA JAPAN SEGÚN SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);  
+
+        
+          
+        // ====================================================================
+        // LÓGICA: ACTUALIZACIÓN EXCLUSIVA DE PRECIOS (KUNSHANG - 13)
+        // ====================================================================
+          } else if (tipoOperacion === 'actualizarPrecioKunshang') {
+          payloadFinal = rawData.map(row => {
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            // Busca la columna que se llame 'kunshang' en el Excel
+            const keyPrecio = Object.keys(row).find(k => {
+               const lowerK = k.trim().toLowerCase();
+               return lowerK === 'kunshang' || lowerK === 'preciokunshang' || lowerK === 'lista makita kunshang';
+            });
+
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            
+            return {
+              ItemCode: String(itemCodeRaw).trim(),
+              PriceListId: 13, // ID EXACTO PARA KUNSHANG SEGÚN SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+
 
         // ====================================================================
         // LÓGICA 1C: ACTUALIZACIÓN EXCLUSIVA DE FABRICANTE Y PAÍS
@@ -142,6 +232,8 @@ export default function ArticulosModule({ onBack }) {
                   item.U_MKA_CIF !== null
               );
           });
+
+
 
 
 
@@ -229,7 +321,13 @@ export default function ArticulosModule({ onBack }) {
           metodoHttp = 'PATCH'; 
         } else if (tipoEstructura === 'simple') {
             */
-        if (tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') {
+        if (    tipoOperacion === 'actualizarPrecioBrasil' 
+            ||  tipoOperacion === 'actualizarPrecioBolivia' 
+            ||  tipoOperacion === 'actualizarPrecioJapan' 
+            ||  tipoOperacion === 'actualizarPrecioKunshang'
+            ||  tipoOperacion === 'actualizarPrecioChina'
+          
+          ) {
           endpointDestino = `${baseUrl}/api/Articles/update-price`;
           metodoHttp = 'PATCH'; 
         } else if (tipoOperacion === 'actualizarFabricantePais') {
@@ -399,6 +497,60 @@ export default function ArticulosModule({ onBack }) {
               💲 Actualizar Precio (Lista Bolivia - 8)
             </label>
 
+
+              {/* --- NUEVO RADIO BUTTON PARA JAPAN AÑADIDO AQUÍ --- */}
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizarPrecioJapan'} 
+                onChange={() => {
+                  setTipoOperacion('actualizarPrecioJapan');
+                  setTipoEstructura('simple');
+                }} 
+              />
+              💲 Actualizar Precio (Lista Japan - 15)
+            </label>
+            {/* -------------------------------------------------- */}      
+
+
+            {/* --- NUEVO RADIO BUTTON PARA KUNSHANG AÑADIDO AQUÍ --- */}
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizarPrecioKunshang'} 
+                onChange={() => {
+                  setTipoOperacion('actualizarPrecioKunshang');
+                  setTipoEstructura('simple');
+                }} 
+              />
+              💲 Actualizar Precio (Lista Kunshang - 13)
+            </label>
+            {/* ---------------------------------------------------- */}      
+
+
+
+            {/* --- NUEVO RADIO BUTTON PARA CHINA AÑADIDO AQUÍ --- */}
+            <label style={styles.radioLabel}>
+              <input 
+                type="radio" 
+                name="tipoOperacion" 
+                checked={tipoOperacion === 'actualizarPrecioChina'} 
+                onChange={() => {
+                  setTipoOperacion('actualizarPrecioChina');
+                  setTipoEstructura('simple');
+                }} 
+              />
+              💲 Actualizar Precio (Lista China - 14)
+            </label>
+            {/* -------------------------------------------------- */}    
+
+
+
+
+
+
              {/* NUEVA OPCIÓN: FABRICANTE Y PAÍS */}
             <label style={styles.radioLabel}>
               <input 
@@ -440,7 +592,11 @@ export default function ArticulosModule({ onBack }) {
         {file && !loading && (
           <button type="submit" style={styles.submitBtn}>
             Ejecutar {
-              (tipoOperacion === 'actualizarPrecioBrasil' || tipoOperacion === 'actualizarPrecioBolivia') ? 'ACTUALIZACIÓN DE PRECIOS' :
+              (     tipoOperacion === 'actualizarPrecioBrasil' 
+                ||  tipoOperacion === 'actualizarPrecioBolivia' 
+                ||  tipoOperacion === 'actualizarPrecioJapan' 
+                ||  tipoOperacion === 'actualizarPrecioKunshang' 
+                ||  tipoOperacion === 'actualizarPrecioChina'   ) ? 'ACTUALIZACIÓN DE PRECIOS' :
               (tipoOperacion === 'actualizarFabricantePais') ? 'ACTUALIZACIÓN DE FABRICANTE/PAÍS' :
               `${tipoOperacion.toUpperCase()} Masiva`
             } en Lotes

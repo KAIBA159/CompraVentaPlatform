@@ -356,7 +356,6 @@ namespace Services.Identity.API.Controllers
         }
 
 
-
         [HttpPatch("update-price")]
         public async Task<IActionResult> ActualizarPrecioListaMasivo([FromBody] List<ActualizarPrecioListaDto> payload)
         {
@@ -372,21 +371,39 @@ namespace Services.Identity.API.Controllers
                 if (string.IsNullOrEmpty(sessionCookie))
                     return Unauthorized(new { success = false, message = "No se pudo autenticar en la Service Layer de SAP." });
 
-                // Función auxiliar para renovar la sesión si SAP bota el error 301
                 Func<Task<string>> renovarSesion = async () => await _sapAuth.ObtenerCookieSesionAsync();
 
-                foreach (var item in payload)
+                // 1. NIVEL DE CONCURRENCIA ESTABLECIDO A 10 HILOS
+                int maxConcurrency = 10;
+                using var semaphore = new SemaphoreSlim(maxConcurrency);
+
+                // Colección Thread-Safe obligatoria para evitar colisiones al guardar resultados concurrentes
+                var concurrentResults = new System.Collections.Concurrent.ConcurrentBag<object>();
+
+                // 2. Crear las tareas para cada registro
+                var tasks = payload.Select(async item =>
                 {
+                    await semaphore.WaitAsync(); // Si ya hay 10 procesándose, la petición 11 espera aquí
                     try
                     {
                         var mensaje = await _articleService.ActualizarPrecioEspecificoAsync(item, sessionCookie, renovarSesion);
-                        resultados.Add(new { itemCode = item.ItemCode, status = "OK", message = mensaje });
+                        concurrentResults.Add(new { itemCode = item.ItemCode, status = "OK", message = mensaje });
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message });
+                        concurrentResults.Add(new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message });
                     }
-                }
+                    finally
+                    {
+                        semaphore.Release(); // Libera un cupo para que la siguiente petición entre a SAP
+                    }
+                });
+
+                // 3. Lanzar la ejecución paralela y esperar a que todo el bloque termine
+                await Task.WhenAll(tasks);
+
+                // Convertimos el ConcurrentBag a List para retornarlo ordenado o mapeado al front-end
+                resultados = concurrentResults.ToList();
 
                 return Ok(new { success = true, totalProcesados = payload.Count, detalles = resultados });
             }
@@ -395,6 +412,12 @@ namespace Services.Identity.API.Controllers
                 return StatusCode(500, new { success = false, message = $"Error general: {ex.Message}" });
             }
         }
+
+
+
+
+
+
 
 
 

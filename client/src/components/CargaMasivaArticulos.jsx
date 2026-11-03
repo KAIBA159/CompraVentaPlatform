@@ -50,14 +50,31 @@ export default function CargaMasivaArticulos() {
             detalles: response 
           });
 
-        // 2. LÓGICA: ACTUALIZAR LISTA BRASIL
+        
+          
+          // 2. LÓGICA: ACTUALIZAR LISTA BRASIL
         } else if (operacion === 'actualizarPrecioBrasil') {
 
-
           const payloadBackend = excelData.map(row => {
-            const precioLimpio = String(row.PrecioBrasil || '0').replace(/[^\d.-]/g, '');
+            // 1. Buscamos dinámicamente la llave de ItemCode
+            const keyItemCode = Object.keys(row).find(k => k.trim().toLowerCase() === 'itemcode');
+            
+            // 2. Buscamos dinámicamente la llave del precio para Brasil
+            const keyPrecio = Object.keys(row).find(k => {
+               const lowerK = k.trim().toLowerCase();
+               return lowerK === 'brasil' || lowerK === 'preciobrasil' || lowerK === 'lista makita brasil';
+            });
+
+            // 3. Extraemos los valores usando las llaves encontradas
+            const itemCodeRaw = keyItemCode ? row[keyItemCode] : '';
+            const precioRaw = keyPrecio ? row[keyPrecio] : '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            
+            console.log("Fila Cruda:", row, " | ItemCode Leído:", itemCodeRaw, " | Precio Leído:", precioRaw, " | Precio Limpio:", precioLimpio);
+
+
             return {
-              ItemCode: String(row.ItemCode || '').trim(),
+              ItemCode: String(itemCodeRaw).trim(),
               PriceListId: 16,
               Price: parseFloat(precioLimpio) || 0,
               Currency: "USD" 
@@ -67,7 +84,7 @@ export default function CargaMasivaArticulos() {
           if (payloadBackend.length === 0) {
             setEstadoCarga({ 
                 cargando: false, 
-                mensaje: '❌ Error: No se encontraron artículos válidos o los precios detectados son cero. Revise los títulos del Excel.' 
+                mensaje: '❌ Error: No se encontraron artículos válidos o los precios detectados son cero. Revise los títulos del Excel (debe decir "Brasil").' 
             });
             return;
           }
@@ -79,7 +96,9 @@ export default function CargaMasivaArticulos() {
             detalles: response 
           });
 
-          
+
+
+
           // --- 3. NUEVA LÓGICA: ACTUALIZAR LISTA BOLIVIA ---
         } else if (operacion === 'actualizarPrecioBolivia') {
           const payloadBackend = excelData.map(row => {
@@ -108,6 +127,98 @@ export default function CargaMasivaArticulos() {
             detalles: response 
           });
         // -------------------------------------------------
+
+        // --- 4. NUEVA LÓGICA: ACTUALIZAR LISTA JAPAN ---
+        } else if (operacion === 'actualizarPrecioJapan') {
+          const payloadBackend = excelData.map(row => {
+            // Busca la columna "JAPAN" según tu Excel
+            const precioRaw = row.JAPAN || row.Japan || row.japan || row.PrecioJapan || '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            return {
+              ItemCode: String(row.ItemCode || '').trim(),
+              PriceListId: 15, // ID estricto para la lista de Japan en SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+          if (payloadBackend.length === 0) {
+            setEstadoCarga({ 
+                cargando: false, 
+                mensaje: '❌ Error: No se encontraron artículos válidos o los precios detectados son cero. Revise que la columna en el Excel se llame "JAPAN".' 
+            });
+            return;
+          }
+
+          const response = await articulosService.actualizarPrecioLista(payloadBackend);
+          setEstadoCarga({ 
+            cargando: false, 
+            mensaje: `✅ ¡Excelente trabajo! 📦 Acabas de actualizar el precio de ${payloadBackend.length} artículos en la Lista 15 (Japan).`, 
+            detalles: response 
+          });
+        // -------------------------------------------------  
+
+          // --- NUEVA LÓGICA: ACTUALIZAR LISTA KUNSHANG ---
+        } else if (operacion === 'actualizarPrecioKunshang') {
+          const payloadBackend = excelData.map(row => {
+            // Se alinea a tu captura de pantalla: busca la columna "KUNSHANG"
+            const precioRaw = row.KUNSHANG || row.Kunshang || row.kunshang || row.PrecioKunshang || '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            return {
+              ItemCode: String(row.ItemCode || '').trim(),
+              PriceListId: 13, // ID estricto para Kunshang en SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+          if (payloadBackend.length === 0) {
+            setEstadoCarga({ 
+                cargando: false, 
+                mensaje: '❌ Error: No se encontraron artículos válidos o los precios detectados son cero. Revise que la columna en el Excel se llame "KUNSHANG".' 
+            });
+            return;
+          }
+
+          const response = await articulosService.actualizarPrecioLista(payloadBackend);
+          setEstadoCarga({ 
+            cargando: false, 
+            mensaje: `✅ ¡Excelente trabajo! 📦 Acabas de actualizar el precio de ${payloadBackend.length} artículos en la Lista 13 (Kunshang).`, 
+            detalles: response 
+          });
+        // -------------------------------------------------
+
+      
+      // --- NUEVA LÓGICA: ACTUALIZAR LISTA CHINA ---
+        } else if (operacion === 'actualizarPrecioChina') {
+          const payloadBackend = excelData.map(row => {
+            // Busca la columna "CHINA" según tu captura de Excel
+            const precioRaw = row.CHINA || row.China || row.china || row.PrecioChina || '0';
+            const precioLimpio = String(precioRaw).replace(/[^\d.-]/g, '');
+            return {
+              ItemCode: String(row.ItemCode || '').trim(),
+              PriceListId: 14, // ID estricto para China en SAP
+              Price: parseFloat(precioLimpio) || 0,
+              Currency: "USD" 
+            };
+          }).filter(item => item.ItemCode !== '' && item.Price > 0);
+
+          if (payloadBackend.length === 0) {
+            setEstadoCarga({ 
+                cargando: false, 
+                mensaje: '❌ Error: No se encontraron artículos válidos o los precios detectados son cero. Revise que la columna en el Excel se llame "CHINA".' 
+            });
+            return;
+          }
+
+          const response = await articulosService.actualizarPrecioLista(payloadBackend);
+          setEstadoCarga({ 
+            cargando: false, 
+            mensaje: `✅ ¡Excelente trabajo! 📦 Acabas de actualizar el precio de ${payloadBackend.length} artículos en la Lista 14 (China).`, 
+            detalles: response 
+          });
+        // -------------------------------------------------  
+
 
 
 
@@ -178,6 +289,21 @@ export default function CargaMasivaArticulos() {
             </label>
             {/* -------------------------------------------------- */}
 
+            <label style={styles.radioLabel}>
+              <input type="radio" name="operacion" checked={operacion === 'actualizarPrecioJapan'} onChange={() => setOperacion('actualizarPrecioJapan')} />
+              💲 Actualizar Precio (Lista Japan - 15)
+            </label>
+
+            <label style={styles.radioLabel}>
+              <input type="radio" name="operacion" checked={operacion === 'actualizarPrecioKunshang'} onChange={() => setOperacion('actualizarPrecioKunshang')} />
+              💲 Actualizar Precio (Lista Kunshang - 13)
+            </label>
+
+
+            <label style={styles.radioLabel}>
+              <input type="radio" name="operacion" checked={operacion === 'actualizarPrecioChina'} onChange={() => setOperacion('actualizarPrecioChina')} />
+              💲 Actualizar Precio (Lista China - 14)
+            </label>
 
 
           </div>
