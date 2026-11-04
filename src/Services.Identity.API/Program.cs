@@ -51,7 +51,18 @@ builder.Services.AddCors(options =>
 });
 
 // 5. INYECCIÓN DE DEPENDENCIAS Y CONTROLADORES
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Evita que [ApiController] rechace con HTTP 400 los campos string vacíos ("") del Excel
+    options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+});
+
+
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddTransient<SapServiceLayerAuth>();

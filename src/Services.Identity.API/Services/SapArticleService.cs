@@ -176,7 +176,12 @@ namespace Services.Identity.API.Services
                 {
                     ItemCode = c.ItemCode,
                     Quantity = c.Quantity,
-                    Warehouse = "ALM01"
+                    //Warehouse = "ALM01",
+
+
+                    Warehouse = string.IsNullOrWhiteSpace(c.Warehouse) ? "ALM01" : c.Warehouse,
+                    PriceList = c.PriceList > 0 ? c.PriceList : 1 // Inyecta el número de la lista de precios a nivel de hijo en SAP
+
                 }).ToList();
 
                 var bomPayload = new
@@ -261,7 +266,11 @@ namespace Services.Identity.API.Services
                     {
                         ItemCode = c.ItemCode,
                         Quantity = c.Quantity,
-                        Warehouse = "ALM01"
+                        //Warehouse = "ALM01", 
+                        Warehouse = string.IsNullOrWhiteSpace(c.Warehouse) ? "ALM01" : c.Warehouse,
+                        PriceList = c.PriceList > 0 ? c.PriceList : 1
+
+
                     }).ToList();
 
                     var createBomPayload = new

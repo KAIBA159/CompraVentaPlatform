@@ -245,8 +245,8 @@ export default function ArticulosModule({ onBack }) {
           const articulosMap = {};
 
           rawData.forEach((row) => {
-            const itemCode = row.ItemCode;
-            if (!itemCode || String(itemCode).toUpperCase() === 'ITEMCODE') return;
+            const itemCode = row.ItemCode ? String(row.ItemCode).trim() : '';
+            if (!itemCode || itemCode.toUpperCase() === 'ITEMCODE') return;
 
             if (!articulosMap[itemCode]) {
               const preciosList = [];
@@ -254,44 +254,49 @@ export default function ArticulosModule({ onBack }) {
               Object.keys(row).forEach((colName) => {
                 if (colName.toUpperCase().includes('LISTA') || colName.toUpperCase().includes('PRECIO')) {
                   const partes = colName.split('_');
-                  const idLista = Number(partes[partes.length - 1]);
+                  const idLista = parseInt(partes[partes.length - 1], 10);
+                  const precioNum = Number(row[colName]);
 
-                  if (!isNaN(idLista) && row[colName] !== undefined && row[colName] !== '') {
+                  if (!isNaN(idLista) && row[colName] !== undefined && row[colName] !== '' && !isNaN(precioNum)) {
                     preciosList.push({
-                      priceListId: idLista,
-                      price: Number(row[colName])
+                      PriceListId: idLista,
+                      Price: precioNum
                     });
                   }
                 }
               });
 
               articulosMap[itemCode] = {
-                itemCode: String(itemCode),
-                itemName: row.ItemName ? String(row.ItemName) : '',
-                itemType: row.ItemType ? String(row.ItemType) : 'I',
-                itemsGroupCode: row.ItemsGroupCode ? Number(row.ItemsGroupCode) : 0,
-                
+                ItemCode: itemCode,
+                ItemName: row.ItemName ? String(row.ItemName).trim() : '',
+                ItemType: row.ItemType ? String(row.ItemType).trim() : 'I',
+                ItemsGroupCode: parseInt(row.ItemsGroupCode, 10) || 0,
+
                 // Vigencia y UDFs
-                valid: row.Valid ? String(row.Valid) : 'tYES',
-                validTo: formatValidToDate(row.ValidTo),
-                u_EXX_TIPOEXIS: row.U_EXX_TIPOEXIS ? String(row.U_EXX_TIPOEXIS) : '',
-                u_EXX_TIPOUMED: row.U_EXX_TIPOUMED ? String(row.U_EXX_TIPOUMED) : '',
-                u_EXM_PERCOM: row.U_EXM_PERCOM ? String(row.U_EXM_PERCOM) : '',
-                u_EXM_ESTOBS: row.U_EXM_ESTOBS ? String(row.U_EXM_ESTOBS) : '',
-                u_MKA_TINCOS: row.U_MKA_TINCOS ? String(row.U_MKA_TINCOS) : '',
-                
-                treeType: row.TipoLMat ? String(row.TipoLMat) : 'iSales',
-                esCombo: tipoEstructura === 'con_bom' || String(row.Tipo || '').toUpperCase() === 'COMBO',
-                precios: preciosList,
-                componentes: []
+                Valid: row.Valid ? String(row.Valid).trim() : 'tYES',
+                ValidTo: formatValidToDate(row.ValidTo),
+                U_EXX_TIPOEXIS: row.U_EXX_TIPOEXIS ? String(row.U_EXX_TIPOEXIS).trim() : '',
+                U_EXX_TIPOUMED: row.U_EXX_TIPOUMED ? String(row.U_EXX_TIPOUMED).trim() : '',
+                U_EXM_PERCOM: row.U_EXM_PERCOM ? String(row.U_EXM_PERCOM).trim() : '',
+                U_EXM_ESTOBS: row.U_EXM_ESTOBS ? String(row.U_EXM_ESTOBS).trim() : '',
+                U_MKA_TINCOS: row.U_MKA_TINCOS ? String(row.U_MKA_TINCOS).trim() : '',
+
+                TreeType: row.TipoLMat ? String(row.TipoLMat).trim() : 'iSales',
+                Precios: preciosList,
+                Componentes: []
               };
             }
 
-            // Si es un BOM, extraer sus componentes
+            // Si es un BOM, extraer sus componentes con Componente_PriceList_Hijo
             if (tipoEstructura === 'con_bom' && row.Componente_Code) {
-              articulosMap[itemCode].componentes.push({
-                itemCode: String(row.Componente_Code),
-                quantity: Number(row.Componente_Qty || 1)
+              const priceListHijoVal = parseInt(row.Componente_PriceList_Hijo, 10) || 1;
+              const qtyVal = Number(row.Componente_Qty);
+
+              articulosMap[itemCode].Componentes.push({
+                ItemCode: String(row.Componente_Code).trim(),
+                Quantity: !isNaN(qtyVal) && qtyVal > 0 ? qtyVal : 1,
+                Warehouse: String(row.Componente_Whs || 'ALM01').trim(),
+                PriceList: priceListHijoVal
               });
             }
           });
@@ -348,6 +353,7 @@ export default function ArticulosModule({ onBack }) {
         // ====================================================================
         // EJECUCIÓN POR LOTES (BATCH PROCESSING)
         // ====================================================================
+        
         const tamanoBloque = 50;
         let detallesAcumulados = [];
 
@@ -356,7 +362,9 @@ export default function ArticulosModule({ onBack }) {
           const nroBloqueActual = Math.floor(i / tamanoBloque) + 1;
           const totalBloques = Math.ceil(totalRegistros / tamanoBloque);
 
-          setProgresoTexto(`Procesando bloque ${nroBloqueActual} de ${totalBloques} (${i + 1} al ${Math.min(i + tamanoBloque, totalRegistros)} de ${totalRegistros} artículos)...`);
+          setProgresoTexto(
+            `Procesando bloque ${nroBloqueActual} de ${totalBloques} (${i + 1} al ${Math.min(i + tamanoBloque, totalRegistros)} de ${totalRegistros} artículos)...`
+          );
           setPorcentajeProgreso(Math.round(((i + bloque.length) / totalRegistros) * 100));
 
           try {
@@ -366,7 +374,14 @@ export default function ArticulosModule({ onBack }) {
               body: JSON.stringify(bloque)
             });
 
-            const data = await response.json().catch(() => ({}));
+            // Leemos primero como texto para capturar cualquier respuesta 400 o 500 de .NET
+            const rawText = await response.text();
+            let data = {};
+            try {
+              data = rawText ? JSON.parse(rawText) : {};
+            } catch {
+              data = { message: rawText };
+            }
 
             if (response.ok) {
               const resultadosBloque = data.detalles || data;
@@ -376,9 +391,18 @@ export default function ArticulosModule({ onBack }) {
                 detallesAcumulados.push(data);
               }
             } else {
+              // Captura errores de Model Binding de .NET 10 (data.errors / data.title) o mensajes propios
+              const detalleError =
+                data.message ||
+                (data.errors ? JSON.stringify(data.errors) : null) ||
+                data.title ||
+                rawText ||
+                `Sin detalle (HTTP ${response.status})`;
+
               detallesAcumulados.push({
                 status: 'ERROR_BLOQUE',
-                message: `Error HTTP en bloque ${nroBloqueActual}: ${data.message || 'Desconocido'}`
+                httpStatus: response.status,
+                message: `Error HTTP (${response.status}) en bloque ${nroBloqueActual}: ${detalleError}`
               });
             }
           } catch (bloqueError) {
@@ -389,10 +413,24 @@ export default function ArticulosModule({ onBack }) {
           }
         }
 
+        
+
+        // Verificamos si algún lote HTTP, conexión de red o registro en SAP devolvió error
+        const huboErrores = detallesAcumulados.some(
+          (d) =>
+            d?.status === 'ERROR_BLOQUE' ||
+            d?.status === 'ERROR_RED' ||
+            d?.status === 'ERROR' ||
+            d?.exito === false ||
+            d?.Exito === false
+        );
+
         setLoading(false);
         setResultado({
-          success: true,
-          message: `Proceso finalizado exitosamente.`,
+          success: !huboErrores,
+          message: huboErrores
+            ? 'El proceso terminó con observaciones o errores.'
+            : 'Proceso finalizado exitosamente.',
           total: totalRegistros,
           detalles: detallesAcumulados
         });
@@ -404,6 +442,9 @@ export default function ArticulosModule({ onBack }) {
     };
 
     reader.readAsArrayBuffer(file);
+  
+  
+  
   };
 
   return (

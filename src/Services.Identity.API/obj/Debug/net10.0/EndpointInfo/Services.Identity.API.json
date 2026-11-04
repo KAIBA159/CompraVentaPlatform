@@ -503,6 +503,14 @@
           "quantity": {
             "type": "number",
             "format": "double"
+          },
+          "warehouse": {
+            "type": "string",
+            "nullable": true
+          },
+          "priceList": {
+            "type": "integer",
+            "format": "int32"
           }
         },
         "additionalProperties": false
