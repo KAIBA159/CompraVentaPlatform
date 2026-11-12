@@ -13,65 +13,61 @@ namespace Services.Identity.API.Controllers
         private readonly SapServiceLayerAuth _sapAuth;
         private readonly SapArticleService _articleService;
         private readonly SapSettings _sapSettings;
+        private readonly SapConcurrencyService _sapConcurrency;
 
         public ArticlesController(
             SapServiceLayerAuth sapAuth,
             SapArticleService articleService,
-            IOptions<SapSettings> sapSettings)
+            IOptions<SapSettings> sapSettings,
+            SapConcurrencyService sapConcurrency)
         {
             _sapAuth = sapAuth;
             _articleService = articleService;
             _sapSettings = sapSettings.Value;
+            _sapConcurrency = sapConcurrency;
         }
 
-        private HttpClient CrearSapHttpClient()
+        // Handler compartido para reutilizar sockets TCP/SSL sin colisión de cabeceras entre hilos
+        private HttpClientHandler CrearSapHttpHandler()
         {
-            var handler = new HttpClientHandler
+            return new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
             };
-
-            return new HttpClient(handler) { BaseAddress = new Uri(_sapSettings.Server) };
         }
 
-
-
-
-
-
-
-
-
+        private HttpClient CrearClienteLigero(HttpMessageHandler sharedHandler)
+        {
+            return new HttpClient(sharedHandler, disposeHandler: false)
+            {
+                BaseAddress = new Uri(_sapSettings.Server)
+            };
+        }
 
         // ==============================================================================
-        // CARGA DESDE EXCEL (NUEVO ENDPOINT)
+        // CARGA DESDE EXCEL (CONCURRENTE)
         // ==============================================================================
-
-
         [HttpPost("upload-excel-fabricante")]
         public async Task<IActionResult> UploadExcelFabricantePais(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 return BadRequest(new { success = false, message = "No se proporcionó ningún archivo Excel." });
 
-            var resultados = new List<object>();
             var dtoLista = new List<ActualizarFabricantePaisDto>();
 
             try
             {
-                // 1. Leer el archivo Excel en memoria utilizando ClosedXML
                 using (var stream = new MemoryStream())
                 {
                     await file.CopyToAsync(stream);
                     using (var workbook = new XLWorkbook(stream))
                     {
-                        var worksheet = workbook.Worksheet(1); // Lee la primera hoja
+                        var worksheet = workbook.Worksheet(1);
                         var rows = worksheet.RangeUsed().RowsUsed();
                         bool isFirstRow = true;
 
                         foreach (var row in rows)
                         {
-                            // Omitir la fila de cabeceras
                             if (isFirstRow)
                             {
                                 isFirstRow = false;
@@ -80,76 +76,53 @@ namespace Services.Identity.API.Controllers
 
                             var itemCode = row.Cell(1).GetString().Trim();
 
-                            // CORRECCIÓN: Evita procesar celdas vacías o la segunda cabecera literal
                             if (string.IsNullOrEmpty(itemCode) || itemCode.Equals("ItemCode", StringComparison.OrdinalIgnoreCase))
                                 continue;
 
-
-
-
                             var dto = new ActualizarFabricantePaisDto { ItemCode = itemCode };
 
-                            // Mapeo seguro: Solo asigna si la celda tiene un valor válido
                             var firmCodeStr = row.Cell(2).GetString().Trim();
                             if (int.TryParse(firmCodeStr, out int firmCode))
-                            {
                                 dto.Manufacturer = firmCode;
-                            }
 
                             var pais = row.Cell(3).GetString().Trim();
                             if (!string.IsNullOrEmpty(pais))
-                            {
                                 dto.CountryOfOrigin = pais;
-                            }
 
-                            // Mapeo del nuevo campo U_MKA_CIF (Ejemplo asumiendo que está en la columna 4)
                             var cifValor = row.Cell(4).GetString().Trim();
                             if (!string.IsNullOrEmpty(cifValor))
-                            {
                                 dto.U_MKA_CIF = cifValor;
-                            }
-
 
                             dtoLista.Add(dto);
                         }
                     }
                 }
 
-                // 2. Orquestar la actualización
                 string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
-                using var client = CrearSapHttpClient();
+                using var handler = CrearSapHttpHandler();
+                Func<Task<string>> renovarSesion = async () => await _sapAuth.ObtenerCookieSesionAsync(forzarNuevoLogin: true);
 
-                // Delegado mejorado: Le pasamos 'true' para forzar que SAP genere una sesión limpia
-                Func<Task<string>> renovarSesion = async () =>
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ActualizarFabricantePaisDto, object>(dtoLista, async item =>
                 {
-                    return await _sapAuth.ObtenerCookieSesionAsync(forzarNuevoLogin: true);
-                };
-
-
-
-                foreach (var item in dtoLista)
-                {
-                    // CORRECCIÓN CABECERA EXCEL: Ignoramos si por accidente se coló la fila 2
-                    if (item.ItemCode.Equals("ItemCode", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
                     try
                     {
+                        using var client = CrearClienteLigero(handler);
                         var mensaje = await _articleService.ActualizarFabricanteYPaisAsync(item, sessionCookie, client, renovarSesion);
-                        resultados.Add(new { itemCode = item.ItemCode, status = "OK", message = mensaje });
+                        return new { itemCode = item.ItemCode, status = "OK", message = mensaje };
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message });
+                        return new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message };
                     }
-                }
+                });
 
-                return Ok(new { success = true, totalProcesados = dtoLista.Count, detalles = resultados });
-
-
-
-
-
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = dtoLista.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
@@ -157,41 +130,46 @@ namespace Services.Identity.API.Controllers
             }
         }
 
-
-
-
         // ==============================================================================
-        // MÉTODOS EXISTENTES: ARTÍCULOS SIMPLES Y COMBOS
+        // ARTÍCULOS SIMPLES (CONCURRENTES)
         // ==============================================================================
-
-
         [HttpPost("crear-masivo-simples")]
         public async Task<IActionResult> CrearArticulosSimplesMasivos([FromBody] List<ArticuloSimpleMigracionDto> articulos)
         {
             if (articulos == null || !articulos.Any())
                 return BadRequest(new { success = false, message = "La lista de artículos está vacía." });
 
-            var resultados = new List<object>();
-
             try
             {
                 string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
-                using var client = CrearSapHttpClient();
+                using var handler = CrearSapHttpHandler();
 
-                foreach (var item in articulos)
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ArticuloSimpleMigracionDto, object>(articulos, async item =>
                 {
                     try
                     {
+                        using var client = CrearClienteLigero(handler);
                         var resultado = await _articleService.CrearArticuloSimpleAsync(item, sessionCookie, client);
-                        resultados.Add(new { itemCode = item.ItemCode, status = resultado.Exito ? "OK" : "ERROR_ITEM", message = resultado.Exito ? "Registrado correctamente en SAP B1" : resultado.Mensaje });
+                        return new
+                        {
+                            itemCode = item.ItemCode,
+                            status = resultado.Exito ? "OK" : "ERROR_ITEM",
+                            message = resultado.Exito ? "Registrado correctamente en SAP B1" : resultado.Mensaje
+                        };
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = item.ItemCode, status = "EXCEPTION", message = exItem.Message });
+                        return new { itemCode = item.ItemCode, status = "EXCEPTION", message = exItem.Message };
                     }
-                }
+                });
 
-                return Ok(new { success = true, totalProcesados = articulos.Count, detalles = resultados });
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = articulos.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
@@ -205,27 +183,37 @@ namespace Services.Identity.API.Controllers
             if (articulos == null || !articulos.Any())
                 return BadRequest(new { success = false, message = "La lista de artículos está vacía." });
 
-            var resultados = new List<object>();
-
             try
             {
                 string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
-                using var client = CrearSapHttpClient();
+                using var handler = CrearSapHttpHandler();
 
-                foreach (var item in articulos)
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ArticuloSimpleMigracionDto, object>(articulos, async item =>
                 {
                     try
                     {
+                        using var client = CrearClienteLigero(handler);
                         var resultado = await _articleService.ActualizarArticuloSimpleAsync(item, sessionCookie, client);
-                        resultados.Add(new { itemCode = item.ItemCode, status = resultado.Exito ? "OK" : "ERROR_ITEM", message = resultado.Exito ? "Actualizado correctamente en SAP B1" : resultado.Mensaje });
+                        return new
+                        {
+                            itemCode = item.ItemCode,
+                            status = resultado.Exito ? "OK" : "ERROR_ITEM",
+                            message = resultado.Exito ? "Actualizado correctamente en SAP B1" : resultado.Mensaje
+                        };
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = item.ItemCode, status = "EXCEPTION", message = exItem.Message });
+                        return new { itemCode = item.ItemCode, status = "EXCEPTION", message = exItem.Message };
                     }
-                }
+                });
 
-                return Ok(new { success = true, totalProcesados = articulos.Count, detalles = resultados });
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = articulos.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
@@ -233,33 +221,41 @@ namespace Services.Identity.API.Controllers
             }
         }
 
+        // ==============================================================================
+        // COMBOS (CONCURRENTES)
+        // ==============================================================================
         [HttpPost("crear-masivo-combos")]
         public async Task<IActionResult> CrearCombosMasivos([FromBody] List<ArticuloComboMigracionDto> combos)
         {
             if (combos == null || !combos.Any())
                 return BadRequest(new { success = false, message = "No se recibieron combos para procesar." });
 
-            var resultados = new List<object>();
-
             try
             {
                 string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
-                using var client = CrearSapHttpClient();
+                using var handler = CrearSapHttpHandler();
 
-                foreach (var combo in combos)
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ArticuloComboMigracionDto, object>(combos, async combo =>
                 {
                     try
                     {
+                        using var client = CrearClienteLigero(handler);
                         var resultado = await _articleService.CrearArticuloComboAsync(combo, sessionCookie, client);
-                        resultados.Add(new { itemCode = combo.ItemCode, status = resultado.Exito ? "OK" : "ERROR_ITEM", message = resultado.Mensaje });
+                        return new { itemCode = combo.ItemCode, status = resultado.Exito ? "OK" : "ERROR_ITEM", message = resultado.Mensaje };
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = combo.ItemCode, status = "EXCEPTION", message = exItem.Message });
+                        return new { itemCode = combo.ItemCode, status = "EXCEPTION", message = exItem.Message };
                     }
-                }
+                });
 
-                return Ok(new { success = true, totalProcesados = combos.Count, detalles = resultados });
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = combos.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
@@ -267,37 +263,38 @@ namespace Services.Identity.API.Controllers
             }
         }
 
-        // ==============================================================================
-        // ENDPOINT: ACTUALIZAR COMBOS MASIVOS (PATCH)
-        // ==============================================================================
-        [HttpPost("actualizar-masivo-combos")] // React manda un POST con el JSON masivo a este endpoint de control
+        [HttpPost("actualizar-masivo-combos")]
         public async Task<IActionResult> ActualizarCombosMasivos([FromBody] List<ArticuloComboMigracionDto> combos)
         {
             if (combos == null || !combos.Any())
                 return BadRequest(new { success = false, message = "No se recibieron combos para actualizar." });
 
-            var resultados = new List<object>();
-
             try
             {
                 string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
-                using var client = CrearSapHttpClient();
+                using var handler = CrearSapHttpHandler();
 
-                foreach (var combo in combos)
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ArticuloComboMigracionDto, object>(combos, async combo =>
                 {
                     try
                     {
-                        // Llama al método que hace PATCH dinámico (ignora nulos)
+                        using var client = CrearClienteLigero(handler);
                         var resultado = await _articleService.ActualizarArticuloComboAsync(combo, sessionCookie, client);
-                        resultados.Add(new { itemCode = combo.ItemCode, status = resultado.Exito ? "OK" : "ERROR_ITEM", message = resultado.Mensaje });
+                        return new { itemCode = combo.ItemCode, status = resultado.Exito ? "OK" : "ERROR_ITEM", message = resultado.Mensaje };
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = combo.ItemCode, status = "EXCEPTION", message = exItem.Message });
+                        return new { itemCode = combo.ItemCode, status = "EXCEPTION", message = exItem.Message };
                     }
-                }
+                });
 
-                return Ok(new { success = true, totalProcesados = combos.Count, detalles = resultados });
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = combos.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
@@ -305,49 +302,42 @@ namespace Services.Identity.API.Controllers
             }
         }
 
-
-
-
         // ==============================================================================
-        // MÉTODOS DE ACTUALIZACIÓN ESPECÍFICA (PATCH)
+        // ACTUALIZACIONES ESPECÍFICAS PATCH (CONCURRENTES)
         // ==============================================================================
-
         [HttpPatch("update-manufacturer")]
         public async Task<IActionResult> ActualizarFabricantePaisMasivo([FromBody] List<ActualizarFabricantePaisDto> payload)
         {
             if (payload == null || !payload.Any())
                 return BadRequest(new { success = false, message = "La lista de datos está vacía." });
 
-            var resultados = new List<object>();
-
             try
             {
                 string sessionCookie = await _sapAuth.ObtenerCookieSesionAsync();
-                using var client = CrearSapHttpClient();
+                using var handler = CrearSapHttpHandler();
+                Func<Task<string>> renovarSesion = async () => await _sapAuth.ObtenerCookieSesionAsync(forzarNuevoLogin: true);
 
-                // Definimos el delegado para renovar la sesión en caliente
-                Func<Task<string>> renovarSesion = async () =>
-                {
-                    // ObtenerCookieSesionAsync debe encargarse de forzar un login nuevo
-                    // y no devolver una cookie en caché si esta caducó.
-                    return await _sapAuth.ObtenerCookieSesionAsync();
-                };
-
-                foreach (var item in payload)
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ActualizarFabricantePaisDto, object>(payload, async item =>
                 {
                     try
                     {
-                        // Agregamos renovarSesion como el cuarto argumento
+                        using var client = CrearClienteLigero(handler);
                         var mensaje = await _articleService.ActualizarFabricanteYPaisAsync(item, sessionCookie, client, renovarSesion);
-                        resultados.Add(new { itemCode = item.ItemCode, status = "OK", message = mensaje });
+                        return new { itemCode = item.ItemCode, status = "OK", message = mensaje };
                     }
                     catch (Exception exItem)
                     {
-                        resultados.Add(new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message });
+                        return new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message };
                     }
-                }
+                });
 
-                return Ok(new { success = true, totalProcesados = payload.Count, detalles = resultados });
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = payload.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
@@ -355,14 +345,11 @@ namespace Services.Identity.API.Controllers
             }
         }
 
-
         [HttpPatch("update-price")]
         public async Task<IActionResult> ActualizarPrecioListaMasivo([FromBody] List<ActualizarPrecioListaDto> payload)
         {
             if (payload == null || !payload.Any())
                 return BadRequest(new { success = false, message = "La lista de precios está vacía." });
-
-            var resultados = new List<object>();
 
             try
             {
@@ -371,56 +358,33 @@ namespace Services.Identity.API.Controllers
                 if (string.IsNullOrEmpty(sessionCookie))
                     return Unauthorized(new { success = false, message = "No se pudo autenticar en la Service Layer de SAP." });
 
-                Func<Task<string>> renovarSesion = async () => await _sapAuth.ObtenerCookieSesionAsync();
+                Func<Task<string>> renovarSesion = async () => await _sapAuth.ObtenerCookieSesionAsync(forzarNuevoLogin: true);
 
-                // 1. NIVEL DE CONCURRENCIA ESTABLECIDO A 10 HILOS
-                int maxConcurrency = 10;
-                using var semaphore = new SemaphoreSlim(maxConcurrency);
-
-                // Colección Thread-Safe obligatoria para evitar colisiones al guardar resultados concurrentes
-                var concurrentResults = new System.Collections.Concurrent.ConcurrentBag<object>();
-
-                // 2. Crear las tareas para cada registro
-                var tasks = payload.Select(async item =>
+                var resultados = await _sapConcurrency.EjecutarLoteAsync<ActualizarPrecioListaDto, object>(payload, async item =>
                 {
-                    await semaphore.WaitAsync(); // Si ya hay 10 procesándose, la petición 11 espera aquí
                     try
                     {
                         var mensaje = await _articleService.ActualizarPrecioEspecificoAsync(item, sessionCookie, renovarSesion);
-                        concurrentResults.Add(new { itemCode = item.ItemCode, status = "OK", message = mensaje });
+                        return new { itemCode = item.ItemCode, status = "OK", message = mensaje };
                     }
                     catch (Exception exItem)
                     {
-                        concurrentResults.Add(new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message });
-                    }
-                    finally
-                    {
-                        semaphore.Release(); // Libera un cupo para que la siguiente petición entre a SAP
+                        return new { itemCode = item.ItemCode, status = "ERROR", message = exItem.Message };
                     }
                 });
 
-                // 3. Lanzar la ejecución paralela y esperar a que todo el bloque termine
-                await Task.WhenAll(tasks);
-
-                // Convertimos el ConcurrentBag a List para retornarlo ordenado o mapeado al front-end
-                resultados = concurrentResults.ToList();
-
-                return Ok(new { success = true, totalProcesados = payload.Count, detalles = resultados });
+                return Ok(new
+                {
+                    success = true,
+                    hilosConfigurados = _sapConcurrency.MaxConcurrency,
+                    totalProcesados = payload.Count,
+                    detalles = resultados
+                });
             }
             catch (Exception ex)
             {
                 return StatusCode(500, new { success = false, message = $"Error general: {ex.Message}" });
             }
         }
-
-
-
-
-
-
-
-
-
-
     }
 }
